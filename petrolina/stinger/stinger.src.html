@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Instant Replay — Powered by Petrolina</title>
+<style>
+/* ============================================================
+   INSTANT REPLAY stinger — sponsored by Petrolina
+   Palette from the Petrolina logo + petrolina.com.cy stylesheet:
+     #00529B logo blue · #009CDE accent · #003087 deep · #29377E indigo
+   Motorsport treatment: speed bands, checkered flag, racing stripes.
+
+   Timing comes from two custom properties set by JS:
+     --in   = duration * transitionPoint       (cover the screen)
+     --out  = duration * (1 - transitionPoint) (uncover the screen)
+   The screen is guaranteed 100% opaque at the transition point.
+   ============================================================ */
+
+:root {
+  --logo: url(__LOGO_DATA_URI__);
+  --blue:        #00529B;
+  --blue-bright: #009CDE;
+  --blue-deep:   #003087;
+  --indigo:      #29377E;
+  --white:       #FFFFFF;
+  --ink:         #04101F;
+  --tilt: -2.4deg;        /* band tilt — motion, not a level horizon */
+  --lean: -8deg;          /* type slant */
+  --n: 6;                 /* speed bands */
+}
+
+html, body {
+  margin: 0; padding: 0; width: 100%; height: 100%;
+  background: transparent;
+  overflow: hidden;
+  cursor: none;
+}
+
+#stage {
+  position: fixed; inset: 0;
+  --in: 700ms;
+  --out: 700ms;
+  --sd: 0.040;            /* per-band stagger, fraction of the phase */
+  --stravel: 0.50;        /* band travel time, fraction of the phase */
+  font-family: "Arial Black", "Segoe UI Black", "Arial Bold", Impact, sans-serif;
+}
+
+#stage > * { position: absolute; }
+
+/* ---------- Layer 1: speed bands that cover the screen ---------- */
+
+.bands {
+  left: -20vw; top: -18vh; width: 140vw; height: 136vh;
+  transform: skewY(var(--tilt));
+  z-index: 10;
+}
+
+.band {
+  position: absolute; left: 0; width: 100%;
+  height: calc(136vh / var(--n) + 2px);
+  top: calc(var(--i) * 136vh / var(--n));
+  background: linear-gradient(90deg, #061A2E 0%, var(--ink) 40%, #030D1A 100%);
+  transform: translate3d(160vw, 0, 0);
+  will-change: transform;
+  backface-visibility: hidden;
+  overflow: hidden;
+}
+
+/* every other band a shade lighter, so the cover reads as stacked lanes */
+.band:nth-child(even) {
+  background: linear-gradient(90deg, #08213A 0%, #051529 45%, #04101F 100%);
+}
+
+/* bright leading edge */
+.band::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0;
+  width: 6px;
+  background: var(--edge);
+  box-shadow: 0 0 20px 4px var(--edge), 0 0 64px 12px var(--edgeA);
+  opacity: 0;
+}
+
+/* internal motion streaks */
+.band::after {
+  content: ""; position: absolute; inset: 0;
+  background:
+    linear-gradient(90deg, var(--edgeA) 0%, transparent 26%),
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.045) 0 1px, transparent 1px 9px);
+  opacity: 0.55;
+}
+
+/* ---------- Layer 2: track dressing over the assembled cover ---------- */
+
+.backdrop { inset: 0; z-index: 20; opacity: 0; pointer-events: none; }
+
+/* two racing stripes raking across the frame */
+.stripes {
+  position: absolute; left: -20vw; top: -25vh; width: 140vw; height: 150vh;
+  transform: skewX(-18deg);
+  background:
+    linear-gradient(90deg, transparent 21%, rgba(0,156,222,0.16) 21%, rgba(0,156,222,0.16) 25%, transparent 25%),
+    linear-gradient(90deg, transparent 27%, rgba(255,255,255,0.10) 27%, rgba(255,255,255,0.10) 29.5%, transparent 29.5%),
+    linear-gradient(90deg, transparent 71%, rgba(0,82,155,0.22) 71%, rgba(0,82,155,0.22) 77%, transparent 77%),
+    linear-gradient(90deg, transparent 79%, rgba(255,255,255,0.08) 79%, rgba(255,255,255,0.08) 81%, transparent 81%);
+}
+
+/* checkered flag strips, top and bottom */
+/* Tall enough, and pulled out of frame, that the band tilt can never open a
+   gap between the strip and the screen edge. */
+.checker {
+  position: absolute; left: -12vw; width: 124vw; height: 9vh;
+  background-color: rgba(4,16,31,0.92);
+  background-image:
+    linear-gradient(45deg, rgba(255,255,255,0.92) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.92) 75%),
+    linear-gradient(45deg, rgba(255,255,255,0.92) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.92) 75%);
+  background-size: 4.5vh 4.5vh;
+  background-position: 0 0, 2.25vh 2.25vh;
+  box-shadow: 0 0 34px rgba(0,156,222,0.5);
+}
+.checker.top    { top: -4vh;    transform: skewY(var(--tilt)); }
+.checker.bottom { bottom: -4vh; transform: skewY(var(--tilt)); }
+
+.glow {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(62% 52% at 50% 46%, rgba(0,156,222,0.34), transparent 72%),
+    radial-gradient(90% 70% at 50% 108%, rgba(0,82,155,0.40), transparent 70%),
+    radial-gradient(125% 120% at 50% 50%, transparent 38%, rgba(0,0,0,0.80) 100%);
+}
+
+/* ---------- Layer 3: speed FX ---------- */
+
+.fx { inset: 0; z-index: 30; pointer-events: none; }
+
+.streak {
+  position: absolute;
+  top: var(--y); left: 50%;
+  height: var(--h, 3px);
+  width: var(--w);
+  background: linear-gradient(90deg, transparent, var(--edge));
+  box-shadow: 0 0 14px var(--edge);
+  transform: skewY(var(--tilt)) translate3d(0, 0, 0) scaleX(0.2);
+  opacity: 0;
+}
+
+.flash {
+  position: absolute; inset: 0;
+  background: radial-gradient(72% 62% at 50% 48%, #ffffff 0%, rgba(190,232,255,0.9) 38%, rgba(0,156,222,0.3) 72%, transparent 100%);
+  opacity: 0;
+  z-index: 40;
+}
+
+/* ---------- Layer 4: the lockup ---------- */
+
+.lockup {
+  left: 50%; top: 50%;
+  transform: translate3d(-50%, -50%, 0);
+  z-index: 50;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 2.2vh;
+  width: 92vw;
+  opacity: 0;
+}
+
+.run .lockup { opacity: 1; }
+
+/* circular replay arrow — the motif, so give it room */
+.replay { width: 17.5vh; height: 17.5vh; opacity: 0; will-change: transform, opacity; }
+.replay svg { width: 100%; height: 100%; overflow: visible; }
+
+.replay .track {
+  fill: none; stroke: rgba(255,255,255,0.14); stroke-width: 9;
+}
+.replay .arc {
+  fill: none; stroke: var(--blue-bright); stroke-width: 9; stroke-linecap: butt;
+  stroke-dasharray: 172; stroke-dashoffset: 172;
+  filter: drop-shadow(0 0 12px rgba(0,156,222,0.95));
+}
+.replay .head {
+  fill: var(--blue-bright);
+  filter: drop-shadow(0 0 12px rgba(0,156,222,0.95));
+  opacity: 0;
+}
+
+/* headline */
+.title {
+  font-size: 8.4vh; line-height: 0.92; color: var(--white);
+  letter-spacing: 0.055em; white-space: nowrap;
+  transform: skewX(var(--lean));
+  text-shadow:
+    0 0 24px rgba(0,156,222,0.75),
+    0 0 62px rgba(0,82,155,0.55),
+    0 6px 0 rgba(0,48,135,0.85),
+    0 10px 26px rgba(0,0,0,0.7);
+  opacity: 0; will-change: transform, opacity, filter;
+}
+
+/* chevron rule */
+.rule {
+  display: flex; align-items: center; gap: 1.1vw;
+  width: 46vw; opacity: 0;
+}
+.rule i {
+  flex: 1; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--blue-bright));
+  box-shadow: 0 0 10px rgba(0,156,222,0.8);
+}
+.rule i + i { background: linear-gradient(90deg, var(--blue-bright), transparent); }
+/* CSS-drawn speed marks — a glyph here would depend on font coverage */
+.rule b { display: flex; gap: 0.45vh; }
+.rule b s {
+  display: block; width: 0.9vh; height: 2.6vh;
+  background: var(--blue-bright);
+  transform: skewX(-24deg);
+  box-shadow: 0 0 12px rgba(0,156,222,0.9);
+}
+.rule b s:nth-child(1) { opacity: 0.40; }
+.rule b s:nth-child(2) { opacity: 0.70; }
+
+.powered {
+  font-family: "Segoe UI", Arial, sans-serif; font-weight: 700;
+  font-size: 2.3vh; letter-spacing: 0.46em; text-indent: 0.46em;
+  color: rgba(255,255,255,0.82);
+  text-shadow: 0 0 14px rgba(0,156,222,0.5);
+  opacity: 0;
+}
+
+.sponsor {
+  width: 18vw; aspect-ratio: 492 / 244;
+  background: var(--logo) center / contain no-repeat;
+  filter: drop-shadow(0 0 20px rgba(0,156,222,0.55)) drop-shadow(0 6px 18px rgba(0,0,0,0.75));
+  opacity: 0; will-change: transform, opacity;
+}
+
+/* ============================================================
+   KEYFRAMES
+   ============================================================ */
+
+@keyframes band-in  { from { transform: translate3d(160vw, 0, 0); } to { transform: translate3d(0, 0, 0); } }
+@keyframes band-out { from { transform: translate3d(0, 0, 0); }    to { transform: translate3d(-160vw, 0, 0); } }
+
+@keyframes edge-flash {
+  0%   { opacity: 0; }
+  10%  { opacity: 1; }
+  72%  { opacity: 1; }
+  100% { opacity: 0.30; }
+}
+@keyframes edge-out {
+  0%   { opacity: 0.30; }
+  22%  { opacity: 1; }
+  100% { opacity: 1; }
+}
+
+@keyframes fade-in  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fade-out { from { opacity: 1; } to { opacity: 0; } }
+
+@keyframes checker-roll-t {
+  from { background-position: 0 0, 2.25vh 2.25vh; }
+  to   { background-position: 13.5vh 0, 15.75vh 2.25vh; }
+}
+@keyframes checker-roll-b {
+  from { background-position: 0 0, 2.25vh 2.25vh; }
+  to   { background-position: -13.5vh 0, -11.25vh 2.25vh; }
+}
+
+@keyframes stripes-drift {
+  from { transform: skewX(-18deg) translate3d(3vw, 0, 0); }
+  to   { transform: skewX(-18deg) translate3d(-3vw, 0, 0); }
+}
+
+/* the lockup rises into place, element by element */
+@keyframes rise-in {
+  0%   { opacity: 0; transform: translate3d(0, 5.5vh, 0) scale(0.94); filter: blur(9px); }
+  55%  { opacity: 1; }
+  100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: blur(0px); }
+}
+@keyframes rise-out {
+  0%   { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: blur(0px); }
+  100% { opacity: 0; transform: translate3d(-9vw, 0, 0) scale(1.04); filter: blur(11px); }
+}
+
+@keyframes title-in {
+  0%   { opacity: 0; transform: skewX(var(--lean)) translate3d(16vw, 0, 0) scale(1.22); filter: blur(14px); }
+  46%  { opacity: 1; }
+  70%  { transform: skewX(var(--lean)) translate3d(0, 0, 0) scale(0.985); filter: blur(0px); }
+  86%  { transform: skewX(var(--lean)) translate3d(0, 0, 0) scale(1.012); }
+  100% { opacity: 1; transform: skewX(var(--lean)) translate3d(0, 0, 0) scale(1); filter: blur(0px); }
+}
+@keyframes title-out {
+  0%   { opacity: 1; transform: skewX(var(--lean)) translate3d(0, 0, 0) scale(1); filter: blur(0px); }
+  22%  { transform: skewX(var(--lean)) translate3d(1.4vw, 0, 0) scale(1.008); }
+  100% { opacity: 0; transform: skewX(var(--lean)) translate3d(-18vw, 0, 0) scale(1.1); filter: blur(13px); }
+}
+
+/* replay arrow: rises, spins once, stroke draws round */
+/* spins clockwise, matching the direction the arrowhead points */
+@keyframes replay-in {
+  0%   { opacity: 0; transform: translate3d(0, 7vh, 0) rotate(-200deg) scale(0.35); }
+  40%  { opacity: 1; }
+  78%  { transform: translate3d(0, 0, 0) rotate(6deg) scale(1.06); }
+  100% { opacity: 1; transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+}
+@keyframes replay-draw {
+  0%   { stroke-dashoffset: 172; }
+  100% { stroke-dashoffset: 0; }
+}
+@keyframes head-pop {
+  0%   { opacity: 0; }
+  60%  { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes streak-fly {
+  0%   { opacity: 0; transform: skewY(var(--tilt)) translate3d(40vw, 0, 0) scaleX(0.12); }
+  14%  { opacity: 1; }
+  100% { opacity: 0; transform: skewY(var(--tilt)) translate3d(-80vw, 0, 0) scaleX(1); }
+}
+
+@keyframes flash-pop {
+  0%   { opacity: 0; }
+  20%  { opacity: 0.62; }
+  100% { opacity: 0; }
+}
+
+/* ============================================================
+   RUN STATE
+   ============================================================ */
+
+.run .band {
+  animation:
+    band-in  calc(var(--in) * var(--stravel)) cubic-bezier(0.16, 1, 0.3, 1)
+             calc(var(--in) * var(--sd) * var(--i)) both,
+    band-out calc(var(--out) * 0.46) cubic-bezier(0.7, 0, 0.84, 0)
+             calc(var(--in) + var(--out) * (0.26 + 0.034 * var(--i))) forwards;
+}
+
+.run .band::before {
+  animation:
+    edge-flash calc(var(--in) * var(--stravel)) linear calc(var(--in) * var(--sd) * var(--i)) both,
+    edge-out   calc(var(--out) * 0.46) linear calc(var(--in) + var(--out) * (0.26 + 0.034 * var(--i))) forwards;
+}
+
+.run .backdrop {
+  animation:
+    fade-in  calc(var(--in) * 0.28) ease-out calc(var(--in) * 0.30) both,
+    fade-out calc(var(--out) * 0.32) ease-in calc(var(--in) + var(--out) * 0.18) forwards;
+}
+
+.run .checker.top    { animation: checker-roll-t calc(var(--in) + var(--out)) linear both; }
+.run .checker.bottom { animation: checker-roll-b calc(var(--in) + var(--out)) linear both; }
+.run .stripes        { animation: stripes-drift  calc(var(--in) + var(--out)) linear both; }
+
+.run .replay {
+  animation:
+    replay-in  calc(var(--in) * 0.50) cubic-bezier(0.18, 1, 0.24, 1) calc(var(--in) * 0.38) both,
+    rise-out   calc(var(--out) * 0.34) cubic-bezier(0.6, 0, 0.9, 0.2) calc(var(--in) + var(--out) * 0.10) forwards;
+}
+.run .replay .arc  { animation: replay-draw calc(var(--in) * 0.42) cubic-bezier(0.3, 0.9, 0.3, 1) calc(var(--in) * 0.44) both; }
+.run .replay .head { animation: head-pop    calc(var(--in) * 0.42) linear calc(var(--in) * 0.44) both; }
+
+.run .title {
+  animation:
+    title-in  calc(var(--in) * 0.46) cubic-bezier(0.19, 1, 0.22, 1) calc(var(--in) * 0.46) both,
+    title-out calc(var(--out) * 0.34) cubic-bezier(0.6, 0, 0.9, 0.2) calc(var(--in) + var(--out) * 0.13) forwards;
+}
+
+.run .rule {
+  animation:
+    rise-in  calc(var(--in) * 0.40) cubic-bezier(0.19, 1, 0.22, 1) calc(var(--in) * 0.56) both,
+    rise-out calc(var(--out) * 0.32) ease-in calc(var(--in) + var(--out) * 0.16) forwards;
+}
+.run .powered {
+  animation:
+    rise-in  calc(var(--in) * 0.38) cubic-bezier(0.19, 1, 0.22, 1) calc(var(--in) * 0.60) both,
+    rise-out calc(var(--out) * 0.32) ease-in calc(var(--in) + var(--out) * 0.19) forwards;
+}
+.run .sponsor {
+  animation:
+    rise-in  calc(var(--in) * 0.38) cubic-bezier(0.19, 1, 0.22, 1) calc(var(--in) * 0.64) both,
+    rise-out calc(var(--out) * 0.32) ease-in calc(var(--in) + var(--out) * 0.22) forwards;
+}
+
+.run .streak {
+  animation: streak-fly calc(var(--in) * 0.55) cubic-bezier(0.2, 0.7, 0.2, 1)
+             calc(var(--in) * (0.58 + var(--sdly))) both;
+}
+
+.run .flash { animation: flash-pop calc(var(--in) * 0.26) ease-out calc(var(--in) * 0.66) both; }
+
+/* ============================================================
+   PREVIEW ONLY — mock scenes, never rendered inside OBS
+   ============================================================ */
+
+.mock { display: none; }
+body.preview .mock { display: block; position: absolute; inset: 0; z-index: 0; }
+.mock-a { background: linear-gradient(135deg, #14301c 0%, #244a2c 100%); }
+.mock-b { background: linear-gradient(135deg, #2a1a10 0%, #4a2f18 100%); opacity: 0; }
+.mock span {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  font: 700 5vw/1 system-ui, sans-serif; letter-spacing: 0.3em;
+  color: rgba(255,255,255,0.20);
+}
+body.preview .run .mock-a { animation: fade-out 1ms linear var(--in) forwards; }
+body.preview .run .mock-b { animation: fade-in  1ms linear var(--in) forwards; }
+
+.hint {
+  display: none;
+  position: absolute; left: 16px; bottom: 12px; z-index: 100;
+  font: 500 13px/1.6 ui-monospace, Consolas, monospace;
+  color: rgba(255,255,255,0.5);
+}
+body.preview .hint { display: block; }
+</style>
+</head>
+<body>
+
+<div id="stage">
+
+  <div class="mock mock-a"><span>SCENE A</span></div>
+  <div class="mock mock-b"><span>SCENE B</span></div>
+
+  <!-- 1. speed bands -->
+  <div class="bands">
+    <div class="band" style="--i:0; --edge:#009CDE; --edgeA:rgba(0,156,222,.45)"></div>
+    <div class="band" style="--i:1; --edge:#FFFFFF; --edgeA:rgba(255,255,255,.35)"></div>
+    <div class="band" style="--i:2; --edge:#009CDE; --edgeA:rgba(0,156,222,.45)"></div>
+    <div class="band" style="--i:3; --edge:#00529B; --edgeA:rgba(0,82,155,.50)"></div>
+    <div class="band" style="--i:4; --edge:#009CDE; --edgeA:rgba(0,156,222,.45)"></div>
+    <div class="band" style="--i:5; --edge:#FFFFFF; --edgeA:rgba(255,255,255,.35)"></div>
+  </div>
+
+  <!-- 2. track dressing -->
+  <div class="backdrop">
+    <div class="glow"></div>
+    <div class="stripes"></div>
+    <div class="checker top"></div>
+    <div class="checker bottom"></div>
+  </div>
+
+  <!-- 3. speed fx -->
+  <div class="fx">
+    <div class="streak" style="--y:11vh; --w:40vw; --h:2px; --sdly:0.00; --edge:#009CDE"></div>
+    <div class="streak" style="--y:19vh; --w:24vw; --h:4px; --sdly:0.06; --edge:#FFFFFF"></div>
+    <div class="streak" style="--y:29vh; --w:54vw; --h:2px; --sdly:0.02; --edge:#009CDE"></div>
+    <div class="streak" style="--y:41vh; --w:30vw; --h:5px; --sdly:0.09; --edge:#00529B"></div>
+    <div class="streak" style="--y:60vh; --w:46vw; --h:3px; --sdly:0.01; --edge:#009CDE"></div>
+    <div class="streak" style="--y:71vh; --w:26vw; --h:2px; --sdly:0.08; --edge:#FFFFFF"></div>
+    <div class="streak" style="--y:81vh; --w:50vw; --h:4px; --sdly:0.03; --edge:#009CDE"></div>
+    <div class="streak" style="--y:90vh; --w:22vw; --h:2px; --sdly:0.10; --edge:#00529B"></div>
+  </div>
+  <div class="flash"></div>
+
+  <!-- 4. lockup -->
+  <div class="lockup">
+    <div class="replay">
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <circle class="track" cx="50" cy="50" r="34"></circle>
+        <!-- 290 degrees of arc, anticlockwise from the top -->
+        <path class="arc" d="M 50 16 A 34 34 0 1 0 81.9 38.4"></path>
+        <!-- arrowhead: base butted against the arc start, tip pointing right -->
+        <polygon class="head" points="50,3 50,29 73,16"></polygon>
+      </svg>
+    </div>
+
+    <div class="title">INSTANT REPLAY</div>
+
+    <div class="rule"><i></i><b><s></s><s></s><s></s></b><i></i></div>
+
+    <div class="powered">POWERED BY</div>
+
+    <div class="sponsor" role="img" aria-label="Petrolina"></div>
+  </div>
+
+  <div class="hint">preview mode &middot; press SPACE to replay</div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var stage  = document.getElementById("stage");
+  var params = new URLSearchParams(location.search);
+
+  var DEFAULT_DURATION = num(params.get("duration"), 1400);
+  var DEFAULT_TP       = num(params.get("tp"), 50) / 100;
+  var SOUND            = params.get("sound") !== "0";
+  var SOUND_GAIN       = num(params.get("volume"), 60) / 100;
+  var AUTOSTART        = params.get("autostart") === "1";
+  var IMPACT_MODE      = params.get("impact") || "auto";   // auto | off
+  var IMPACT_GAIN      = num(params.get("impactVolume"), 75) / 100;
+  var IMPACT_OFFSET    = num(params.get("impactOffset"), 0) / 1000;
+  var IMPACT_ALIGN     = params.get("impactAlign") !== "0";
+
+  var sawPluginEvent = false;
+
+  function num(v, d) { var n = parseFloat(v); return isFinite(n) ? n : d; }
+  function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+
+  /* ---------- playback ---------- */
+
+  function play(duration, tp) {
+    duration = duration > 0 ? duration : DEFAULT_DURATION;
+    tp = clamp(tp > 0 ? tp : DEFAULT_TP, 0.05, 0.95);
+
+    stage.style.setProperty("--in",  (duration * tp) + "ms");
+    stage.style.setProperty("--out", (duration * (1 - tp)) + "ms");
+
+    stage.classList.remove("run");
+    void stage.offsetWidth;
+    stage.classList.add("run");
+
+    if (SOUND) { try { sfx(duration, tp); } catch (e) {} }
+  }
+
+  function stop() { stage.classList.remove("run"); }
+
+  /* ---------- OBS Browser Transition plugin hooks ---------- */
+
+  window.addEventListener("transitionStart", function (e) {
+    sawPluginEvent = true;
+    var d = e.detail;
+    if (typeof d === "string") { try { d = JSON.parse(d); } catch (err) { d = {}; } }
+    d = d || {};
+    play(num(d.duration, DEFAULT_DURATION), num(d.transitionPoint, DEFAULT_TP));
+  });
+
+  window.addEventListener("transitionStop", stop);
+
+  window.addEventListener("obsSourceActiveChanged", function (e) {
+    if (sawPluginEvent) return;
+    if (e.detail && e.detail.active) play(DEFAULT_DURATION, DEFAULT_TP);
+  });
+  window.addEventListener("obsSourceVisibleChanged", function (e) {
+    if (sawPluginEvent) return;
+    if (e.detail && e.detail.visible) play(DEFAULT_DURATION, DEFAULT_TP);
+  });
+
+  /* ---------- audio ---------- */
+
+  var ac = null, noiseBuf = null, master = null;
+
+  function audio() {
+    if (!ac) {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      ac = new AC();
+      var n = ac.sampleRate * 2;
+      noiseBuf = ac.createBuffer(1, n, ac.sampleRate);
+      var ch = noiseBuf.getChannelData(0);
+      for (var i = 0; i < n; i++) ch[i] = Math.random() * 2 - 1;
+    }
+    if (!master) { master = ac.createGain(); master.connect(ac.destination); }
+    if (ac.state === "suspended") ac.resume();
+    loadImpact();
+    return ac;
+  }
+
+  function whoosh(t0, dur, f0, f1, peak) {
+    var src = ac.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+    var bp = ac.createBiquadFilter(); bp.type = "bandpass"; bp.Q.value = 1.1;
+    var g = ac.createGain();
+    bp.frequency.setValueAtTime(f0, t0);
+    bp.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(peak, t0 + dur * 0.72);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    src.connect(bp); bp.connect(g); g.connect(master);
+    src.start(t0); src.stop(t0 + dur + 0.05);
+  }
+
+  /* Optional custom impact sample, embedded by build.py. */
+  var IMPACT_URI    = "__IMPACT_AUDIO_URI__";
+  var impactBuf     = null;
+  var impactPending = false;
+  var impactNorm    = 1;
+  var impactOnset   = 0;
+
+  function loadImpact() {
+    if (impactPending || impactBuf || !IMPACT_URI || IMPACT_URI.indexOf("__") === 0) return;
+    impactPending = true;
+    try {
+      var bin = atob(IMPACT_URI.slice(IMPACT_URI.indexOf(",") + 1));
+      var bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      ac.decodeAudioData(
+        bytes.buffer,
+        function (decoded) { impactBuf = decoded; measureImpact(decoded); },
+        function () { impactPending = false; }
+      );
+    } catch (e) { impactPending = false; }
+  }
+
+  function measureImpact(buf) {
+    var ch = buf.getChannelData(0), n = ch.length, i, a;
+
+    var peak = 0;
+    for (i = 0; i < n; i++) { a = ch[i] < 0 ? -ch[i] : ch[i]; if (a > peak) peak = a; }
+    impactNorm = peak > 1e-4 ? Math.min(24, 0.9 / peak) : 1;
+
+    var thr = peak * 0.2;
+    impactOnset = 0;
+    for (i = 0; i < n; i++) {
+      a = ch[i] < 0 ? -ch[i] : ch[i];
+      if (a > thr) { impactOnset = i / buf.sampleRate; break; }
+    }
+
+    window.stingerImpactLoaded = true;
+    window.stingerImpact = { peak: peak, norm: impactNorm,
+                             onset: impactOnset, dur: buf.duration };
+  }
+
+  function impactSample(t0) {
+    var src = ac.createBufferSource();
+    src.buffer = impactBuf;
+    var g = ac.createGain();
+    g.gain.value = clamp(IMPACT_GAIN, 0, 4) * impactNorm;
+    src.connect(g); g.connect(master);
+    var lead = IMPACT_ALIGN ? impactOnset : 0;
+    src.start(Math.max(ac.currentTime, t0 + IMPACT_OFFSET - lead));
+  }
+
+  /* No synthesised impact on this stinger — the whooshes carry it. An impact
+     only sounds if you embed a sample of your own (see build.py). */
+  function impact(t0) {
+    if (impactBuf && IMPACT_MODE !== "off") impactSample(t0);
+  }
+
+  function sfx(duration, tp) {
+    if (!audio()) return;
+    master.gain.value = clamp(SOUND_GAIN, 0, 1) * 0.5;
+
+    var t = ac.currentTime + 0.01;
+    var inS = (duration * tp) / 1000;
+    var outS = (duration * (1 - tp)) / 1000;
+
+    whoosh(t, inS * 0.82, 300, 4200, 0.40);
+    impact(t + inS * 0.70);
+    whoosh(t + inS + outS * 0.24, outS * 0.72, 3400, 240, 0.32);
+  }
+
+  /* ---------- preview mode ---------- */
+
+  function startPreview() {
+    document.body.classList.add("preview");
+    play(DEFAULT_DURATION, DEFAULT_TP);
+    setInterval(function () { play(DEFAULT_DURATION, DEFAULT_TP); }, DEFAULT_DURATION + 1100);
+  }
+
+  if (SOUND) { try { audio(); } catch (e) {} }
+
+  document.addEventListener("keydown", function (e) {
+    if (e.code === "Space") { e.preventDefault(); play(DEFAULT_DURATION, DEFAULT_TP); }
+  });
+
+  if (params.get("preview") === "1") {
+    startPreview();
+  } else if (!window.obsstudio) {
+    setTimeout(function () { if (!sawPluginEvent) startPreview(); }, 800);
+  } else if (AUTOSTART) {
+    setTimeout(function () { if (!sawPluginEvent) play(DEFAULT_DURATION, DEFAULT_TP); }, 60);
+  }
+})();
+</script>
+</body>
+</html>

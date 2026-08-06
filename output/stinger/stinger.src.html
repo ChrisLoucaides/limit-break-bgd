@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Limit Break — Stinger Transition</title>
+<style>
+/* ============================================================
+   LIMIT BREAK — OBS Browser Transition stinger
+   Brand: cyan #00D4FF -> magenta #EE00CC on #08081A
+   Timing is driven entirely by two custom properties set by JS:
+     --in   = duration * transitionPoint      (cover the screen)
+     --out  = duration * (1 - transitionPoint) (uncover the screen)
+   The screen is guaranteed 100% opaque at the transition point.
+   ============================================================ */
+
+:root {
+  --logo: url(__LOGO_DATA_URI__);
+  --cyan: #00D4FF;
+  --magenta: #EE00CC;
+  --ink: #08081A;
+  --skew: -9deg;
+  --n: 7;                /* shard count */
+}
+
+html, body {
+  margin: 0; padding: 0; width: 100%; height: 100%;
+  background: transparent;
+  overflow: hidden;
+  cursor: none;
+}
+
+#stage {
+  position: fixed; inset: 0;
+  /* Sensible defaults; overwritten by the plugin's transitionStart event. */
+  --in: 700ms;
+  --out: 700ms;
+  /* stagger step + travel time, as a fraction of the phase */
+  --sd: 0.038;
+  --stravel: 0.50;
+}
+
+#stage > * { position: absolute; }
+
+/* ---------- Layer 1: the shards that cover the screen ---------- */
+
+.shards {
+  left: -15vw; top: -20vh; width: 130vw; height: 140vh;
+  transform: skewX(var(--skew));
+  z-index: 10;
+}
+
+.shard {
+  position: absolute; top: 0; height: 100%;
+  width: calc(130vw / var(--n) + 2px);
+  left: calc(var(--i) * 130vw / var(--n));
+  background: linear-gradient(200deg, #0B0B22 0%, var(--ink) 45%, #05050F 100%);
+  transform: translate3d(150vw, 0, 0);
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+/* neon leading edge */
+.shard::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0;
+  width: 5px;
+  background: var(--edge);
+  box-shadow: 0 0 18px 3px var(--edge), 0 0 60px 10px var(--edgeA);
+  opacity: 0;
+}
+
+/* faint inner sheen so the flat fill doesn't read as dead space */
+.shard::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(180deg, var(--edgeA), transparent 55%);
+  opacity: 0.22;
+}
+
+/* ---------- Layer 2: backdrop detail over the assembled cover ---------- */
+
+.backdrop {
+  inset: 0; z-index: 20; opacity: 0;
+  pointer-events: none;
+}
+
+.grid {
+  position: absolute; left: -20vw; top: -20vh; width: 140vw; height: 140vh;
+  transform: skewX(var(--skew));
+  background-image:
+    repeating-linear-gradient(90deg, rgba(0,212,255,0.16) 0 1px, transparent 1px 5.2vw),
+    repeating-linear-gradient(0deg,  rgba(238,0,204,0.11) 0 1px, transparent 1px 5.2vw);
+  -webkit-mask-image: radial-gradient(120% 90% at 50% 50%, #000 25%, transparent 78%);
+          mask-image: radial-gradient(120% 90% at 50% 50%, #000 25%, transparent 78%);
+}
+
+.glow {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(58% 46% at 34% 40%, rgba(0,212,255,0.30), transparent 70%),
+    radial-gradient(58% 46% at 68% 64%, rgba(238,0,204,0.28), transparent 70%),
+    radial-gradient(120% 120% at 50% 50%, transparent 40%, rgba(0,0,0,0.72) 100%);
+}
+
+.scanlines {
+  position: absolute; inset: 0;
+  background: repeating-linear-gradient(0deg, rgba(0,0,0,0.30) 0 1px, transparent 1px 3px);
+  opacity: 0.45;
+}
+
+/* ---------- Layer 3: impact FX ---------- */
+
+.fx { inset: 0; z-index: 30; pointer-events: none; }
+
+.ring {
+  position: absolute; left: 50%; top: 50%;
+  width: 34vw; height: 34vw; margin: -17vw 0 0 -17vw;
+  border: 3px solid var(--cyan);
+  box-shadow: 0 0 30px rgba(0,212,255,0.65), inset 0 0 30px rgba(0,212,255,0.35);
+  transform: skewX(var(--skew)) scale(0.2);
+  opacity: 0;
+}
+.ring.r2 { border-color: var(--magenta); box-shadow: 0 0 30px rgba(238,0,204,0.6), inset 0 0 30px rgba(238,0,204,0.3); }
+
+.streak {
+  position: absolute;
+  top: var(--y); left: 50%;
+  height: var(--h, 3px);
+  width: var(--w);
+  background: linear-gradient(90deg, transparent, var(--edge));
+  box-shadow: 0 0 12px var(--edge);
+  transform: skewX(var(--skew)) translate3d(0, 0, 0) scaleX(0.2);
+  opacity: 0;
+}
+
+.flash {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(70% 60% at 50% 50%, #ffffff 0%, rgba(190,240,255,0.85) 40%, rgba(238,0,204,0.25) 75%, transparent 100%);
+  opacity: 0;
+  z-index: 40;
+}
+
+/* ---------- Layer 4: the logo ---------- */
+
+.logo-group {
+  left: 50%; top: 50%;
+  width: 52vw; aspect-ratio: 1200 / 857;
+  max-height: 60vh;
+  transform: translate3d(-50%, -50%, 0);
+  z-index: 50;
+  isolation: isolate;          /* keep the chromatic ghosts self-contained */
+  opacity: 0;
+}
+
+.logo-inner { position: absolute; inset: 0; will-change: transform, filter, opacity; }
+
+.logo {
+  position: absolute; inset: 0;
+  background: var(--logo) center / contain no-repeat;
+  filter: drop-shadow(0 0 26px rgba(0,212,255,0.45)) drop-shadow(0 12px 30px rgba(0,0,0,0.8));
+}
+
+/* chromatic-aberration ghosts: solid colour masked by the logo artwork */
+.ghost {
+  position: absolute; inset: 0;
+  -webkit-mask: var(--logo) center / contain no-repeat;
+          mask: var(--logo) center / contain no-repeat;
+  mix-blend-mode: screen;
+  opacity: 0;
+}
+.ghost.c { background: var(--cyan); }
+.ghost.m { background: var(--magenta); }
+
+/* ============================================================
+   KEYFRAMES
+   ============================================================ */
+
+@keyframes shard-in  { from { transform: translate3d(150vw, 0, 0); } to { transform: translate3d(0, 0, 0); } }
+@keyframes shard-out { from { transform: translate3d(0, 0, 0); }   to { transform: translate3d(-150vw, 0, 0); } }
+
+@keyframes edge-flash {
+  0%   { opacity: 0; }
+  12%  { opacity: 1; }
+  70%  { opacity: 1; }
+  100% { opacity: 0.32; }
+}
+@keyframes edge-out {
+  0%   { opacity: 0.32; }
+  25%  { opacity: 1; }
+  100% { opacity: 1; }
+}
+
+@keyframes fade-in  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fade-out { from { opacity: 1; } to { opacity: 0; } }
+
+@keyframes grid-drift {
+  from { transform: skewX(var(--skew)) translate3d(0, 0, 0); }
+  to   { transform: skewX(var(--skew)) translate3d(-5.2vw, -2.6vw, 0); }
+}
+
+@keyframes logo-in {
+  0%   { opacity: 0; transform: translate3d(22vw, 0, 0) skewX(-16deg) scale(1.7);  filter: blur(16px); }
+  40%  { opacity: 1; }
+  62%  { transform: translate3d(0, 0, 0) skewX(0deg) scale(0.955); filter: blur(0px); }
+  76%  { transform: translate3d(0, 0, 0) scale(1.028); }
+  88%  { transform: translate3d(0, 0, 0) scale(0.992); }
+  100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: blur(0px); }
+}
+
+@keyframes logo-out {
+  0%   { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: blur(0px); }
+  18%  { transform: translate3d(1.6vw, 0, 0) scale(1.01); }
+  34%  { transform: translate3d(-1.2vw, 0, 0) scale(1.02); }
+  100% { opacity: 0; transform: translate3d(-16vw, 0, 0) skewX(-14deg) scale(1.14); filter: blur(12px); }
+}
+
+@keyframes ghost-c-in {
+  0%   { opacity: 0.95; transform: translate3d(-3.5vw, -0.6vh, 0); }
+  55%  { opacity: 0.55; }
+  100% { opacity: 0;    transform: translate3d(0, 0, 0); }
+}
+@keyframes ghost-m-in {
+  0%   { opacity: 0.95; transform: translate3d(3.5vw, 0.6vh, 0); }
+  55%  { opacity: 0.55; }
+  100% { opacity: 0;    transform: translate3d(0, 0, 0); }
+}
+@keyframes ghost-c-out {
+  0%   { opacity: 0;   transform: translate3d(0, 0, 0); }
+  30%  { opacity: 0.8; transform: translate3d(-1.6vw, 0, 0); }
+  100% { opacity: 0;   transform: translate3d(-6vw, 0, 0); }
+}
+@keyframes ghost-m-out {
+  0%   { opacity: 0;   transform: translate3d(0, 0, 0); }
+  30%  { opacity: 0.8; transform: translate3d(1.6vw, 0, 0); }
+  100% { opacity: 0;   transform: translate3d(4vw, 0, 0); }
+}
+
+@keyframes ring-pop {
+  0%   { opacity: 0;    transform: skewX(var(--skew)) scale(0.15); }
+  10%  { opacity: 0.95; }
+  100% { opacity: 0;    transform: skewX(var(--skew)) scale(2.6); border-width: 1px; }
+}
+
+@keyframes streak-fly {
+  0%   { opacity: 0;   transform: skewX(var(--skew)) translate3d(35vw, 0, 0) scaleX(0.15); }
+  15%  { opacity: 1; }
+  100% { opacity: 0;   transform: skewX(var(--skew)) translate3d(-75vw, 0, 0) scaleX(1); }
+}
+
+@keyframes flash-pop {
+  0%   { opacity: 0; }
+  18%  { opacity: 0.72; }
+  100% { opacity: 0; }
+}
+
+/* ============================================================
+   RUN STATE — everything is inert until #stage gets .run
+   ============================================================ */
+
+.run .shard {
+  animation:
+    shard-in  calc(var(--in) * var(--stravel)) cubic-bezier(0.16, 1, 0.3, 1)
+              calc(var(--in) * var(--sd) * var(--i)) both,
+    shard-out calc(var(--out) * 0.46) cubic-bezier(0.7, 0, 0.84, 0)
+              calc(var(--in) + var(--out) * (0.26 + 0.035 * var(--i))) forwards;
+}
+
+.run .shard::before {
+  animation:
+    edge-flash calc(var(--in) * var(--stravel)) linear calc(var(--in) * var(--sd) * var(--i)) both,
+    edge-out   calc(var(--out) * 0.46) linear calc(var(--in) + var(--out) * (0.26 + 0.035 * var(--i))) forwards;
+}
+
+.run .backdrop {
+  animation:
+    fade-in  calc(var(--in) * 0.30) ease-out calc(var(--in) * 0.30) both,
+    fade-out calc(var(--out) * 0.34) ease-in calc(var(--in) + var(--out) * 0.18) forwards;
+}
+
+.run .grid {
+  animation: grid-drift calc(var(--in) + var(--out)) linear both;
+}
+
+.run .logo-group { opacity: 1; }
+
+.run .logo-inner {
+  animation:
+    logo-in  calc(var(--in) * 0.48) cubic-bezier(0.19, 1, 0.22, 1) calc(var(--in) * 0.42) both,
+    logo-out calc(var(--out) * 0.36) cubic-bezier(0.6, 0, 0.9, 0.2) calc(var(--in) + var(--out) * 0.14) forwards;
+}
+
+.run .ghost.c {
+  animation:
+    ghost-c-in  calc(var(--in) * 0.48) ease-out calc(var(--in) * 0.42) both,
+    ghost-c-out calc(var(--out) * 0.36) linear  calc(var(--in) + var(--out) * 0.14) forwards;
+}
+.run .ghost.m {
+  animation:
+    ghost-m-in  calc(var(--in) * 0.48) ease-out calc(var(--in) * 0.42) both,
+    ghost-m-out calc(var(--out) * 0.36) linear  calc(var(--in) + var(--out) * 0.14) forwards;
+}
+
+.run .ring   { animation: ring-pop calc(var(--in) * 0.55) cubic-bezier(0.12, 0.8, 0.3, 1) calc(var(--in) * 0.70) both; }
+.run .ring.r2{ animation-delay: calc(var(--in) * 0.78); }
+
+.run .streak {
+  animation: streak-fly calc(var(--in) * 0.55) cubic-bezier(0.2, 0.7, 0.2, 1)
+             calc(var(--in) * (0.64 + var(--sdly))) both;
+}
+
+.run .flash { animation: flash-pop calc(var(--in) * 0.26) ease-out calc(var(--in) * 0.68) both; }
+
+/* ============================================================
+   PREVIEW ONLY — mock scenes so the stinger can be judged in
+   context when the file is opened in a normal browser.
+   Never rendered inside OBS.
+   ============================================================ */
+
+.mock { display: none; }
+body.preview .mock { display: block; position: absolute; inset: 0; z-index: 0; }
+
+.mock-a { background: linear-gradient(135deg, #123 0%, #1b2a4a 100%); }
+.mock-b { background: linear-gradient(135deg, #3a1140 0%, #61123f 100%); opacity: 0; }
+
+.mock span {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  font: 700 5vw/1 system-ui, sans-serif; letter-spacing: 0.3em;
+  color: rgba(255,255,255,0.22);
+}
+
+body.preview .run .mock-a { animation: fade-out 1ms linear var(--in) forwards; }
+body.preview .run .mock-b { animation: fade-in  1ms linear var(--in) forwards; }
+
+.hint {
+  display: none;
+  position: absolute; left: 16px; bottom: 12px; z-index: 100;
+  font: 500 13px/1.6 ui-monospace, Consolas, monospace;
+  color: rgba(255,255,255,0.5);
+}
+body.preview .hint { display: block; }
+</style>
+</head>
+<body>
+
+<div id="stage">
+
+  <!-- preview-only mock scenes -->
+  <div class="mock mock-a"><span>SCENE A</span></div>
+  <div class="mock mock-b"><span>SCENE B</span></div>
+
+  <!-- 1. shards -->
+  <div class="shards">
+    <div class="shard" style="--i:0; --edge:#00D4FF; --edgeA:rgba(0,212,255,.5)"></div>
+    <div class="shard" style="--i:1; --edge:#00A8FF; --edgeA:rgba(0,168,255,.5)"></div>
+    <div class="shard" style="--i:2; --edge:#3B7BFF; --edgeA:rgba(59,123,255,.5)"></div>
+    <div class="shard" style="--i:3; --edge:#7A4DFF; --edgeA:rgba(122,77,255,.5)"></div>
+    <div class="shard" style="--i:4; --edge:#A32DF0; --edgeA:rgba(163,45,240,.5)"></div>
+    <div class="shard" style="--i:5; --edge:#CE16DC; --edgeA:rgba(206,22,220,.5)"></div>
+    <div class="shard" style="--i:6; --edge:#EE00CC; --edgeA:rgba(238,0,204,.5)"></div>
+  </div>
+
+  <!-- 2. backdrop detail -->
+  <div class="backdrop">
+    <div class="glow"></div>
+    <div class="grid"></div>
+    <div class="scanlines"></div>
+  </div>
+
+  <!-- 3. impact fx -->
+  <div class="fx">
+    <div class="ring"></div>
+    <div class="ring r2"></div>
+    <div class="streak" style="--y:14vh; --w:38vw; --h:2px; --sdly:0.00; --edge:#00D4FF"></div>
+    <div class="streak" style="--y:23vh; --w:22vw; --h:4px; --sdly:0.05; --edge:#4CC9FF"></div>
+    <div class="streak" style="--y:34vh; --w:52vw; --h:2px; --sdly:0.02; --edge:#00D4FF"></div>
+    <div class="streak" style="--y:44vh; --w:30vw; --h:5px; --sdly:0.08; --edge:#8A5BFF"></div>
+    <div class="streak" style="--y:57vh; --w:44vw; --h:3px; --sdly:0.01; --edge:#C11ADF"></div>
+    <div class="streak" style="--y:66vh; --w:26vw; --h:2px; --sdly:0.07; --edge:#EE00CC"></div>
+    <div class="streak" style="--y:76vh; --w:48vw; --h:4px; --sdly:0.03; --edge:#EE00CC"></div>
+    <div class="streak" style="--y:87vh; --w:20vw; --h:2px; --sdly:0.09; --edge:#FF57E0"></div>
+  </div>
+  <div class="flash"></div>
+
+  <!-- 4. logo -->
+  <div class="logo-group">
+    <div class="logo-inner">
+      <div class="ghost c"></div>
+      <div class="ghost m"></div>
+      <div class="logo"></div>
+    </div>
+  </div>
+
+  <div class="hint">preview mode &middot; press SPACE to replay</div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var stage  = document.getElementById("stage");
+  var params = new URLSearchParams(location.search);
+
+  var DEFAULT_DURATION = num(params.get("duration"), 1400);   // ms
+  var DEFAULT_TP       = num(params.get("tp"), 50) / 100;     // 0..1
+  var SOUND            = params.get("sound") !== "0";
+  var SOUND_GAIN       = num(params.get("volume"), 60) / 100;
+  var AUTOSTART        = params.get("autostart") === "1";
+  var IMPACT_MODE      = params.get("impact") || "auto";          // auto | synth
+  var IMPACT_GAIN      = num(params.get("impactVolume"), 75) / 100;
+  var IMPACT_OFFSET    = num(params.get("impactOffset"), 0) / 1000; // ms -> s, may be negative
+  var IMPACT_ALIGN     = params.get("impactAlign") !== "0";       // auto lead-in compensation
+
+  var sawPluginEvent = false;
+
+  function num(v, d) { var n = parseFloat(v); return isFinite(n) ? n : d; }
+  function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+
+  /* ---------- playback ---------- */
+
+  function play(duration, tp) {
+    duration = duration > 0 ? duration : DEFAULT_DURATION;
+    tp = clamp(tp > 0 ? tp : DEFAULT_TP, 0.05, 0.95);
+
+    stage.style.setProperty("--in",  (duration * tp) + "ms");
+    stage.style.setProperty("--out", (duration * (1 - tp)) + "ms");
+
+    stage.classList.remove("run");
+    void stage.offsetWidth;              // force reflow so the animations restart
+    stage.classList.add("run");
+
+    if (SOUND) { try { sfx(duration, tp); } catch (e) {} }
+  }
+
+  function stop() { stage.classList.remove("run"); }
+
+  /* ---------- OBS Browser Transition plugin hooks ---------- */
+
+  // Modern plugin (>= 0.1.1 / OBS 30+): detail = { transition, trackMatte, duration, transitionPoint }
+  window.addEventListener("transitionStart", function (e) {
+    sawPluginEvent = true;
+    var d = e.detail;
+    if (typeof d === "string") { try { d = JSON.parse(d); } catch (err) { d = {}; } }
+    d = d || {};
+    play(num(d.duration, DEFAULT_DURATION), num(d.transitionPoint, DEFAULT_TP));
+  });
+
+  window.addEventListener("transitionStop", stop);
+
+  // Legacy fallback: older plugin builds only toggle the browser source active.
+  window.addEventListener("obsSourceActiveChanged", function (e) {
+    if (sawPluginEvent) return;                       // modern path already handled it
+    if (e.detail && e.detail.active) play(DEFAULT_DURATION, DEFAULT_TP);
+  });
+  window.addEventListener("obsSourceVisibleChanged", function (e) {
+    if (sawPluginEvent) return;
+    if (e.detail && e.detail.visible) play(DEFAULT_DURATION, DEFAULT_TP);
+  });
+
+  /* ---------- audio: synthesised whoosh + impact, no asset files ---------- */
+
+  var ac = null, noiseBuf = null;
+
+  function audio() {
+    if (!ac) {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      ac = new AC();
+      var n = ac.sampleRate * 2;
+      noiseBuf = ac.createBuffer(1, n, ac.sampleRate);
+      var ch = noiseBuf.getChannelData(0);
+      for (var i = 0; i < n; i++) ch[i] = Math.random() * 2 - 1;
+    }
+    if (!master) { master = ac.createGain(); master.connect(ac.destination); }
+    if (ac.state === "suspended") ac.resume();
+    loadImpact();
+    return ac;
+  }
+
+  function whoosh(t0, dur, f0, f1, peak) {
+    var src = ac.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+    var bp = ac.createBiquadFilter(); bp.type = "bandpass"; bp.Q.value = 1.1;
+    var g = ac.createGain();
+    bp.frequency.setValueAtTime(f0, t0);
+    bp.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(peak, t0 + dur * 0.72);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    src.connect(bp); bp.connect(g); g.connect(master);
+    src.start(t0); src.stop(t0 + dur + 0.05);
+  }
+
+  /* Custom impact sample (embedded by build.py from impact.<ext> in this
+     folder). Falls back to the synthesised thud when no file was supplied. */
+  var IMPACT_URI    = "__IMPACT_AUDIO_URI__";
+  var impactBuf     = null;
+  var impactPending = false;
+  var impactNorm    = 1;   // peak-normalisation factor, measured on decode
+  var impactOnset   = 0;   // seconds of lead-in before the sample's audible hit
+
+  function loadImpact() {
+    if (impactPending || impactBuf || !IMPACT_URI || IMPACT_URI.indexOf("__") === 0) return;
+    impactPending = true;
+    try {
+      // Decode the base64 payload by hand rather than fetch()ing the data: URI —
+      // no scheme/CORS surprises inside CEF.
+      var bin = atob(IMPACT_URI.slice(IMPACT_URI.indexOf(",") + 1));
+      var bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      ac.decodeAudioData(
+        bytes.buffer,
+        function (decoded) { impactBuf = decoded; measureImpact(decoded); },
+        function () { impactPending = false; }          // stay on the synth thud
+      );
+    } catch (e) { impactPending = false; }
+  }
+
+  /* Source samples arrive at wildly different levels and often carry a bar of
+     near-silence before the hit, so measure both rather than trusting them. */
+  function measureImpact(buf) {
+    var ch = buf.getChannelData(0), n = ch.length, i, a;
+
+    var peak = 0;
+    for (i = 0; i < n; i++) { a = ch[i] < 0 ? -ch[i] : ch[i]; if (a > peak) peak = a; }
+    impactNorm = peak > 1e-4 ? Math.min(24, 0.9 / peak) : 1;
+
+    var thr = peak * 0.2;
+    impactOnset = 0;
+    for (i = 0; i < n; i++) {
+      a = ch[i] < 0 ? -ch[i] : ch[i];
+      if (a > thr) { impactOnset = i / buf.sampleRate; break; }
+    }
+
+    window.stingerImpactLoaded = true;
+    window.stingerImpact = { peak: peak, norm: impactNorm,
+                             onset: impactOnset, dur: buf.duration };
+  }
+
+  function impactSample(t0) {
+    var src = ac.createBufferSource();
+    src.buffer = impactBuf;
+    var g = ac.createGain();
+    g.gain.value = clamp(IMPACT_GAIN, 0, 4) * impactNorm;
+    src.connect(g); g.connect(master);
+    // start early by the sample's own lead-in so its hit lands on the logo hit
+    var lead = IMPACT_ALIGN ? impactOnset : 0;
+    src.start(Math.max(ac.currentTime, t0 + IMPACT_OFFSET - lead));
+  }
+
+  function impact(t0) {
+    if (impactBuf && IMPACT_MODE !== "synth") { impactSample(t0); return; }
+
+    // sub drop
+    var o = ac.createOscillator(); o.type = "sine";
+    var g = ac.createGain();
+    o.frequency.setValueAtTime(210, t0);
+    o.frequency.exponentialRampToValueAtTime(42, t0 + 0.34);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(1.0, t0 + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.42);
+    o.connect(g); g.connect(master);
+    o.start(t0); o.stop(t0 + 0.45);
+
+    // transient crack
+    var src = ac.createBufferSource(); src.buffer = noiseBuf;
+    var lp = ac.createBiquadFilter(); lp.type = "lowpass";
+    var g2 = ac.createGain();
+    lp.frequency.setValueAtTime(9000, t0);
+    lp.frequency.exponentialRampToValueAtTime(700, t0 + 0.2);
+    g2.gain.setValueAtTime(0.55, t0);
+    g2.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.22);
+    src.connect(lp); lp.connect(g2); g2.connect(master);
+    src.start(t0); src.stop(t0 + 0.25);
+  }
+
+  var master = null;
+
+  function sfx(duration, tp) {
+    if (!audio()) return;
+    if (!master) {
+      master = ac.createGain();
+      master.connect(ac.destination);
+    }
+    master.gain.value = clamp(SOUND_GAIN, 0, 1) * 0.5;
+
+    var t = ac.currentTime + 0.01;
+    var inS = (duration * tp) / 1000;
+    var outS = (duration * (1 - tp)) / 1000;
+
+    whoosh(t, inS * 0.80, 260, 3600, 0.42);          // shards sweeping in
+    impact(t + inS * 0.72);                           // logo lands
+    whoosh(t + inS + outS * 0.24, outS * 0.72, 3000, 220, 0.34); // shards leaving
+  }
+
+  /* ---------- preview mode (opened outside OBS) ---------- */
+
+  function startPreview() {
+    document.body.classList.add("preview");
+    var period = DEFAULT_DURATION + 1100;
+    play(DEFAULT_DURATION, DEFAULT_TP);
+    setInterval(function () { play(DEFAULT_DURATION, DEFAULT_TP); }, period);
+  }
+
+  // Warm the audio graph and decode the impact sample up front so the first
+  // transition is already in sync.
+  if (SOUND) { try { audio(); } catch (e) {} }
+
+  document.addEventListener("keydown", function (e) {
+    if (e.code === "Space") { e.preventDefault(); play(DEFAULT_DURATION, DEFAULT_TP); }
+  });
+
+  if (params.get("preview") === "1") {
+    startPreview();
+  } else if (!window.obsstudio) {
+    // Not running inside OBS at all -> assume a browser preview.
+    setTimeout(function () { if (!sawPluginEvent) startPreview(); }, 800);
+  } else if (AUTOSTART) {
+    // Escape hatch for setups where the source is reloaded per transition and
+    // the page misses transitionStart: fire once, shortly after load.
+    setTimeout(function () { if (!sawPluginEvent) play(DEFAULT_DURATION, DEFAULT_TP); }, 60);
+  }
+})();
+</script>
+</body>
+</html>
