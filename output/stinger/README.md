@@ -12,6 +12,10 @@ plugin for OBS Studio.
 | `build.py` | Regenerates `limit-break-stinger.html` (and the logo) from the template. |
 | `limit-break-logo.png` | Logo cropped/resized from `references/Limit Break Large.png`. |
 | `limit-break-ff7.mp3` | Sound played when the logo lands. See **Impact sound** below. |
+| `perfect-game-stinger.html` | **Smash Ultimate "Perfect Game / 3 Stock" stinger.** See [Perfect Game stinger](#perfect-game-stinger-ssbu). |
+| `perfect-game-preview.gif` | What that one looks like. |
+| `perfect-game.src.html` | Its editable source template. |
+| `petrolina-logo.png`, `saira-semi-condensed-800.woff2` | Assets embedded into the Perfect Game stinger (Petrolina logo from `petrolina/foamboard-check/petrolina-logo-print.png`, headline font). |
 
 ## The animation
 
@@ -125,9 +129,57 @@ replay. To check a specific timing:
 limit-break-stinger.html?preview=1&duration=1000&tp=40
 ```
 
+## Perfect Game stinger (SSBU)
+
+`perfect-game-stinger.html` is a second transition for Super Smash Bros.
+Ultimate, for when a player takes a game without losing a stock. Same shards,
+backdrop and OBS wiring as the main stinger, with a different payload:
+
+1. The shards sweep in and the backdrop fades up, this time with slowly
+   turning light rays behind the card.
+2. **PERFECT / GAME** slams in (stacked and staggered like the Limit Break
+   wordmark, with the same outline and cyan → magenta fill), with the impact
+   sound, flash, rings and streaks. The Petrolina logo drops in above it.
+3. Three stock icons (Smash emblems) pop in one at a time, each with a
+   rising chime (A → C♯ → E), then a **3 STOCK** tag wipes in beside them.
+   A small Limit Break logo sits in the bottom-right corner.
+4. **Scene swap.** A shine sweeps across the headline.
+5. The card rips away to the left and the shards sweep off.
+
+### OBS setup
+
+Add it as its own **Browser Transition** (e.g. `Perfect Game`), with the same
+settings as above except:
+
+- **Duration**: `2400` ms (recommended; 2000–3000 works). There's more to
+  read than on the main stinger, so it needs longer.
+- **Transition Point**: `50` %.
+
+To fire it, pick that transition in the Scene Transitions dropdown before
+you switch scenes after the game. In Studio Mode you can add it as a
+**Quick Transition** and bind that to a hotkey instead.
+
+Verified coverage: the page is fully opaque (alpha = 255) from about 63% of
+the cover phase until about 40% into the reveal phase, checked at 50% and 25%
+transition points.
+
+### Extra options
+
+Everything in the options table above works here too (`duration` defaults to
+`2400`). There are also a few extras:
+
+| Param | Default | Meaning |
+| --- | --- | --- |
+| `title` | `PERFECT\|GAME` | Headline text. `\|` splits the two lines; with no `\|` it's a single line. |
+| `tag` | `3 Stock` | Tag text beside the stock icons. Empty (`tag=`) hides the tag. |
+| `chimeVolume` | `70` | Level of the three stock chimes, 0–200. |
+| `freeze` | – | Render a still frame at this many ms (for checking frames). Add `mock=0` for a transparent background. |
+
+For example, `?title=FLAWLESS|VICTORY&tag=0 Deaths`.
+
 ## Editing
 
-Edit `stinger.src.html`, then:
+Edit `stinger.src.html` or `perfect-game.src.html`, then:
 
 ```
 python build.py

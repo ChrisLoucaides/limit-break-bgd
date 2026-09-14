@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Limit Break — Perfect Game Stinger (SSBU)</title>
+<style>
+/* ============================================================
+   LIMIT BREAK — "PERFECT GAME" stinger for Super Smash Bros. Ultimate
+   Played when a player takes a game without losing a stock.
+
+   Same shard cover / timing contract as limit-break-stinger.html:
+     --in   = duration * transitionPoint      (cover the screen)
+     --out  = duration * (1 - transitionPoint) (uncover the screen)
+   The screen is guaranteed 100% opaque at the transition point.
+   ============================================================ */
+
+@font-face {
+  font-family: "Saira SC";
+  src: url(__FONT_URI__) format("woff2");
+  font-weight: 800;
+  font-display: block;
+}
+
+:root {
+  --logo: url(__LOGO_DATA_URI__);
+  --sponsor: url(__SPONSOR_LOGO_URI__);
+  --cyan: #00D4FF;
+  --magenta: #EE00CC;
+  --ink: #08081A;
+  --skew: -9deg;
+  --n: 7;
+}
+
+html, body {
+  margin: 0; padding: 0; width: 100%; height: 100%;
+  background: transparent;
+  overflow: hidden;
+  cursor: none;
+}
+
+#stage {
+  position: fixed; inset: 0;
+  --in: 1200ms;
+  --out: 1200ms;
+  --sd: 0.038;
+  --stravel: 0.50;
+}
+
+#stage > * { position: absolute; }
+
+/* ---------- Layer 1: shards ---------- */
+
+.shards {
+  left: -15vw; top: -20vh; width: 130vw; height: 140vh;
+  transform: skewX(var(--skew));
+  z-index: 10;
+}
+
+.shard {
+  position: absolute; top: 0; height: 100%;
+  width: calc(130vw / var(--n) + 2px);
+  left: calc(var(--i) * 130vw / var(--n));
+  background: linear-gradient(200deg, #0B0B22 0%, var(--ink) 45%, #05050F 100%);
+  transform: translate3d(150vw, 0, 0);
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+.shard::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0;
+  width: 5px;
+  background: var(--edge);
+  box-shadow: 0 0 18px 3px var(--edge), 0 0 60px 10px var(--edgeA);
+  opacity: 0;
+}
+
+.shard::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(180deg, var(--edgeA), transparent 55%);
+  opacity: 0.22;
+}
+
+/* ---------- Layer 2: backdrop ---------- */
+
+.backdrop { inset: 0; z-index: 20; opacity: 0; pointer-events: none; overflow: hidden; }
+
+.rays {
+  position: absolute; left: 50%; top: 46%;
+  width: 170vmax; height: 170vmax; margin: -85vmax 0 0 -85vmax;
+  background: repeating-conic-gradient(from 0deg,
+    rgba(120,225,255,0.13) 0deg 5deg, transparent 5deg 15deg,
+    rgba(238,80,220,0.10) 15deg 20deg, transparent 20deg 30deg);
+  -webkit-mask-image: radial-gradient(closest-side, #000 8%, rgba(0,0,0,0.5) 38%, transparent 70%);
+          mask-image: radial-gradient(closest-side, #000 8%, rgba(0,0,0,0.5) 38%, transparent 70%);
+}
+
+.grid {
+  position: absolute; left: -20vw; top: -20vh; width: 140vw; height: 140vh;
+  transform: skewX(var(--skew));
+  background-image:
+    repeating-linear-gradient(90deg, rgba(0,212,255,0.14) 0 1px, transparent 1px 5.2vw),
+    repeating-linear-gradient(0deg,  rgba(238,0,204,0.10) 0 1px, transparent 1px 5.2vw);
+  -webkit-mask-image: radial-gradient(120% 90% at 50% 50%, #000 25%, transparent 78%);
+          mask-image: radial-gradient(120% 90% at 50% 50%, #000 25%, transparent 78%);
+}
+
+.glow {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(50% 40% at 50% 46%, rgba(255,255,255,0.10), transparent 70%),
+    radial-gradient(58% 46% at 30% 38%, rgba(0,212,255,0.30), transparent 70%),
+    radial-gradient(58% 46% at 72% 66%, rgba(238,0,204,0.28), transparent 70%),
+    radial-gradient(120% 120% at 50% 50%, transparent 40%, rgba(0,0,0,0.72) 100%);
+}
+
+.scanlines {
+  position: absolute; inset: 0;
+  background: repeating-linear-gradient(0deg, rgba(0,0,0,0.30) 0 1px, transparent 1px 3px);
+  opacity: 0.45;
+}
+
+/* ---------- Layer 3: impact FX ---------- */
+
+.fx { inset: 0; z-index: 30; pointer-events: none; }
+
+.ring {
+  position: absolute; left: 50%; top: 44%;
+  width: 34vw; height: 34vw; margin: -17vw 0 0 -17vw;
+  border: 3px solid var(--cyan);
+  box-shadow: 0 0 30px rgba(0,212,255,0.65), inset 0 0 30px rgba(0,212,255,0.35);
+  transform: skewX(var(--skew)) scale(0.2);
+  opacity: 0;
+}
+.ring.r2 { border-color: var(--magenta); box-shadow: 0 0 30px rgba(238,0,204,0.6), inset 0 0 30px rgba(238,0,204,0.3); }
+
+.streak {
+  position: absolute;
+  top: var(--y); left: 50%;
+  height: var(--h, 3px);
+  width: var(--w);
+  background: linear-gradient(90deg, transparent, var(--edge));
+  box-shadow: 0 0 12px var(--edge);
+  transform: skewX(var(--skew)) translate3d(0, 0, 0) scaleX(0.2);
+  opacity: 0;
+}
+
+.flash {
+  position: absolute; inset: 0;
+  background: radial-gradient(70% 60% at 50% 45%, #ffffff 0%, rgba(190,240,255,0.85) 40%, rgba(238,0,204,0.25) 75%, transparent 100%);
+  opacity: 0;
+  z-index: 40;
+}
+
+/* ---------- Layer 4: the card ---------- */
+
+.card {
+  inset: 0; z-index: 50;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2.4vh;
+  padding-bottom: 2vh;
+  box-sizing: border-box;
+  opacity: 0;
+  pointer-events: none;
+  will-change: transform, filter, opacity;
+}
+
+.sponsor {
+  width: 13vw; aspect-ratio: 900 / 433;
+  background: var(--sponsor) center / contain no-repeat;
+  filter: drop-shadow(0 0 16px rgba(0,212,255,0.35)) drop-shadow(0 6px 14px rgba(0,0,0,0.9));
+  opacity: 0;
+}
+
+/* --- headline: stacked, skewed, extruded like the Limit Break wordmark --- */
+
+.headline {
+  position: relative;
+  font: 800 12.2vw/0.86 "Saira SC", "Bahnschrift", "Arial Black", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: -0.005em;
+  transform: skewX(var(--skew));
+  isolation: isolate;
+  white-space: nowrap;
+}
+
+.hl-inner { position: relative; display: flex; flex-direction: column; align-items: center; will-change: transform, filter, opacity; }
+
+/* stagger the two lines like the Limit Break wordmark; transforms keep the block centred */
+.line { position: relative; display: block; width: max-content; }
+.line.l1 { transform: translateX(-3vw); }
+.line.l2 { transform: translateX(8vw); }
+
+.line > span { display: block; }
+.line > span + span { position: absolute; left: 0; top: 0; }
+
+/* back to front */
+.x-drop    { -webkit-text-stroke: 0.15em #020208; color: #020208; transform: translate(0.045em, 0.06em); }
+.x-outline { -webkit-text-stroke: 0.15em #05050F; color: #05050F; }
+.x-bevel   { color: #146B86; transform: translate(0.028em, 0.034em); }
+.x-fill {
+  color: transparent;
+  background: linear-gradient(180deg, #2BF6FF 0%, #29C9FF 26%, #6C8BFF 50%, #B44BF5 72%, #FF22E4 100%);
+  background-size: 100% 200%;
+  -webkit-background-clip: text; background-clip: text;
+}
+.l1 .x-fill { background-position: 0 0; }
+.l2 .x-fill { background-position: 0 100%; }
+
+.x-shine {
+  color: transparent;
+  background: linear-gradient(105deg, transparent 38%, rgba(255,255,255,0.95) 49%, rgba(255,255,255,0.95) 51%, transparent 62%) no-repeat;
+  background-size: 250% 100%;
+  background-position: 180% 0;
+  -webkit-background-clip: text; background-clip: text;
+}
+
+.x-ghost { color: transparent; mix-blend-mode: screen; opacity: 0; }
+.x-ghost.c { color: var(--cyan); }
+.x-ghost.m { color: var(--magenta); }
+
+/* --- stocks + tag row --- */
+
+.row {
+  display: flex; align-items: center; gap: 2.2vw;
+  margin-top: 1.4vh;
+}
+
+.stocks { display: flex; gap: 1.1vw; }
+
+.stock {
+  position: relative;
+  width: 5.6vw; height: 5.6vw;
+  color: var(--edge);
+  opacity: 0;
+  transform: scale(0);
+}
+.stock svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible;
+  filter: drop-shadow(0 0 0.7vw var(--edgeA)) drop-shadow(0 0.35vw 0.5vw rgba(0,0,0,0.85)); }
+
+.stock::after {                      /* per-stock pop ring */
+  content: ""; position: absolute; inset: -10%;
+  border-radius: 50%;
+  border: 2px solid var(--edge);
+  box-shadow: 0 0 16px var(--edge);
+  opacity: 0; transform: scale(0.6);
+}
+
+.tag {
+  position: relative;
+  transform: skewX(var(--skew));
+  clip-path: inset(0 100% 0 0);
+}
+.tag-plate {
+  font: 800 4.3vw/1 "Saira SC", "Bahnschrift", "Arial Black", sans-serif;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #05050F;
+  padding: 0.16em 0.55em 0.2em;
+  background: linear-gradient(90deg, #2BF6FF 0%, #8A6BFF 55%, #FF22E4 100%);
+  box-shadow: 0.45vw 0.45vw 0 #020208, 0 0 2.2vw rgba(160,90,255,0.55);
+  white-space: nowrap;
+}
+
+/* ---------- corner bug ---------- */
+
+.bug {
+  right: 3vw; bottom: 4vh; z-index: 55;
+  width: 9vw; aspect-ratio: 1200 / 857;
+  background: var(--logo) center / contain no-repeat;
+  filter: drop-shadow(0 4px 10px rgba(0,0,0,0.85));
+  opacity: 0;
+}
+
+/* ============================================================
+   KEYFRAMES
+   ============================================================ */
+
+@keyframes shard-in  { from { transform: translate3d(150vw, 0, 0); } to { transform: translate3d(0, 0, 0); } }
+@keyframes shard-out { from { transform: translate3d(0, 0, 0); }   to { transform: translate3d(-150vw, 0, 0); } }
+
+@keyframes edge-flash { 0% { opacity: 0; } 12% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0.32; } }
+@keyframes edge-out   { 0% { opacity: 0.32; } 25% { opacity: 1; } 100% { opacity: 1; } }
+
+@keyframes fade-in  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fade-out { from { opacity: 1; } to { opacity: 0; } }
+
+@keyframes grid-drift {
+  from { transform: skewX(var(--skew)) translate3d(0, 0, 0); }
+  to   { transform: skewX(var(--skew)) translate3d(-5.2vw, -2.6vw, 0); }
+}
+
+@keyframes rays-spin { from { transform: rotate(0deg) scale(0.85); } to { transform: rotate(24deg) scale(1.05); } }
+
+@keyframes sponsor-in {
+  from { opacity: 0; transform: translate3d(0, -3vh, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes hl-in {
+  0%   { opacity: 0; transform: translate3d(24vw, 0, 0) skewX(-16deg) scale(1.8); filter: blur(16px); }
+  40%  { opacity: 1; }
+  62%  { transform: translate3d(0, 0, 0) skewX(0deg) scale(0.95); filter: blur(0px); }
+  76%  { transform: translate3d(0, 0, 0) scale(1.03); }
+  88%  { transform: translate3d(0, 0, 0) scale(0.992); }
+  100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: blur(0px); }
+}
+
+@keyframes ghost-c-in { 0% { opacity: 0.95; transform: translate3d(-0.35em, -0.03em, 0); } 55% { opacity: 0.55; } 100% { opacity: 0; transform: translate3d(0, 0, 0); } }
+@keyframes ghost-m-in { 0% { opacity: 0.95; transform: translate3d(0.35em, 0.03em, 0); }  55% { opacity: 0.55; } 100% { opacity: 0; transform: translate3d(0, 0, 0); } }
+@keyframes ghost-c-out { 0% { opacity: 0; transform: translate3d(0, 0, 0); } 30% { opacity: 0.8; transform: translate3d(-0.15em, 0, 0); } 100% { opacity: 0; transform: translate3d(-0.6em, 0, 0); } }
+@keyframes ghost-m-out { 0% { opacity: 0; transform: translate3d(0, 0, 0); } 30% { opacity: 0.8; transform: translate3d(0.15em, 0, 0); }  100% { opacity: 0; transform: translate3d(0.4em, 0, 0); } }
+
+@keyframes shine-sweep { from { background-position: 180% 0; } to { background-position: -80% 0; } }
+
+@keyframes stock-pop {
+  0%   { opacity: 0; transform: scale(0) rotate(-40deg); }
+  45%  { opacity: 1; transform: scale(1.38) rotate(6deg); }
+  70%  { transform: scale(0.9) rotate(-2deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+@keyframes stock-ring {
+  0%   { opacity: 0; transform: scale(0.6); }
+  30%  { opacity: 1; }
+  100% { opacity: 0; transform: scale(2.1); border-width: 1px; }
+}
+
+@keyframes tag-wipe {
+  from { clip-path: inset(0 100% 0 0); transform: skewX(var(--skew)) translate3d(-3vw, 0, 0); }
+  to   { clip-path: inset(-20% -10% -40% -10%); transform: skewX(var(--skew)) translate3d(0, 0, 0); }
+}
+
+@keyframes card-out {
+  0%   { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: blur(0px); }
+  18%  { transform: translate3d(1.6vw, 0, 0) scale(1.01); }
+  34%  { transform: translate3d(-1.2vw, 0, 0) scale(1.02); }
+  100% { opacity: 0; transform: translate3d(-16vw, 0, 0) skewX(-14deg) scale(1.14); filter: blur(12px); }
+}
+
+@keyframes ring-pop {
+  0%   { opacity: 0;    transform: skewX(var(--skew)) scale(0.15); }
+  10%  { opacity: 0.95; }
+  100% { opacity: 0;    transform: skewX(var(--skew)) scale(2.6); border-width: 1px; }
+}
+
+@keyframes streak-fly {
+  0%   { opacity: 0; transform: skewX(var(--skew)) translate3d(35vw, 0, 0) scaleX(0.15); }
+  15%  { opacity: 1; }
+  100% { opacity: 0; transform: skewX(var(--skew)) translate3d(-75vw, 0, 0) scaleX(1); }
+}
+
+@keyframes flash-pop { 0% { opacity: 0; } 18% { opacity: 0.72; } 100% { opacity: 0; } }
+
+/* ============================================================
+   RUN STATE — timeline, as fractions of --in / --out
+     0.00–0.73 in   shards sweep in
+     0.30 in        headline slams, lands ~0.59 in (impact)
+     0.60/0.70/0.80 in   stock 1 / 2 / 3 pop
+     0.86 in        "3 STOCK" tag wipes in
+     1.00           ── scene swap ──
+     +0.04 out      shine sweeps the headline
+     +0.30 out      card rips away
+     +0.34 out      shards sweep out (done by 0.99 out)
+   ============================================================ */
+
+.run .shard {
+  animation:
+    shard-in  calc(var(--in) * var(--stravel)) cubic-bezier(0.16, 1, 0.3, 1)
+              calc(var(--in) * var(--sd) * var(--i)) both,
+    shard-out calc(var(--out) * 0.44) cubic-bezier(0.7, 0, 0.84, 0)
+              calc(var(--in) + var(--out) * (0.34 + 0.035 * var(--i))) forwards;
+}
+
+.run .shard::before {
+  animation:
+    edge-flash calc(var(--in) * var(--stravel)) linear calc(var(--in) * var(--sd) * var(--i)) both,
+    edge-out   calc(var(--out) * 0.44) linear calc(var(--in) + var(--out) * (0.34 + 0.035 * var(--i))) forwards;
+}
+
+.run .backdrop {
+  animation:
+    fade-in  calc(var(--in) * 0.30) ease-out calc(var(--in) * 0.30) both,
+    fade-out calc(var(--out) * 0.34) ease-in calc(var(--in) + var(--out) * 0.26) forwards;
+}
+
+.run .grid { animation: grid-drift calc(var(--in) + var(--out)) linear both; }
+.run .rays { animation: rays-spin  calc(var(--in) + var(--out)) linear both; }
+
+.run .card {
+  opacity: 1;
+  animation: card-out calc(var(--out) * 0.36) cubic-bezier(0.6, 0, 0.9, 0.2) calc(var(--in) + var(--out) * 0.30) both;
+  animation-fill-mode: forwards;
+}
+
+.run .bug {
+  animation:
+    fade-in  calc(var(--in) * 0.20) ease-out calc(var(--in) * 0.55) both,
+    fade-out calc(var(--out) * 0.20) ease-in calc(var(--in) + var(--out) * 0.30) forwards;
+}
+
+.run .sponsor { animation: sponsor-in calc(var(--in) * 0.30) cubic-bezier(0.19, 1, 0.22, 1) calc(var(--in) * 0.50) both; }
+
+.run .hl-inner { animation: hl-in calc(var(--in) * 0.46) cubic-bezier(0.19, 1, 0.22, 1) calc(var(--in) * 0.30) both; }
+
+.run .x-ghost.c {
+  animation:
+    ghost-c-in  calc(var(--in) * 0.46) ease-out calc(var(--in) * 0.30) both,
+    ghost-c-out calc(var(--out) * 0.36) linear  calc(var(--in) + var(--out) * 0.30) forwards;
+}
+.run .x-ghost.m {
+  animation:
+    ghost-m-in  calc(var(--in) * 0.46) ease-out calc(var(--in) * 0.30) both,
+    ghost-m-out calc(var(--out) * 0.36) linear  calc(var(--in) + var(--out) * 0.30) forwards;
+}
+
+.run .l1 .x-shine { animation: shine-sweep calc(var(--out) * 0.24) ease-in-out calc(var(--in) + var(--out) * 0.04) both; }
+.run .l2 .x-shine { animation: shine-sweep calc(var(--out) * 0.24) ease-in-out calc(var(--in) + var(--out) * 0.08) both; }
+
+.run .stock {
+  animation: stock-pop calc(var(--in) * 0.26) cubic-bezier(0.2, 0.9, 0.3, 1.2) calc(var(--in) * (0.60 + 0.10 * var(--k))) both;
+}
+.run .stock::after {
+  animation: stock-ring calc(var(--in) * 0.34) ease-out calc(var(--in) * (0.66 + 0.10 * var(--k))) both;
+}
+
+.run .tag { animation: tag-wipe calc(var(--in) * 0.20) cubic-bezier(0.19, 1, 0.22, 1) calc(var(--in) * 0.86) both; }
+
+.run .ring   { animation: ring-pop calc(var(--in) * 0.55) cubic-bezier(0.12, 0.8, 0.3, 1) calc(var(--in) * 0.57) both; }
+.run .ring.r2{ animation-delay: calc(var(--in) * 0.65); }
+
+.run .streak {
+  animation: streak-fly calc(var(--in) * 0.55) cubic-bezier(0.2, 0.7, 0.2, 1)
+             calc(var(--in) * (0.52 + var(--sdly))) both;
+}
+
+.run .flash { animation: flash-pop calc(var(--in) * 0.26) ease-out calc(var(--in) * 0.56) both; }
+
+/* ============================================================
+   PREVIEW ONLY — mock scenes, never rendered inside OBS
+   ============================================================ */
+
+.mock { display: none; }
+body.preview .mock { display: block; position: absolute; inset: 0; z-index: 0; }
+
+.mock-a { background: linear-gradient(135deg, #123 0%, #1b2a4a 100%); }
+.mock-b { background: linear-gradient(135deg, #3a1140 0%, #61123f 100%); opacity: 0; }
+
+.mock span {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  font: 700 5vw/1 system-ui, sans-serif; letter-spacing: 0.3em;
+  color: rgba(255,255,255,0.22);
+}
+
+body.preview .run .mock-a { animation: fade-out 1ms linear var(--in) forwards; }
+body.preview .run .mock-b { animation: fade-in  1ms linear var(--in) forwards; }
+
+.hint {
+  display: none;
+  position: absolute; left: 16px; bottom: 12px; z-index: 100;
+  font: 500 13px/1.6 ui-monospace, Consolas, monospace;
+  color: rgba(255,255,255,0.5);
+}
+body.preview .hint { display: block; }
+</style>
+</head>
+<body>
+
+<!-- Smash emblem, used for the stock icons -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <clipPath id="emblem-clip"><circle cx="50" cy="50" r="50"/></clipPath>
+    <symbol id="emblem" viewBox="0 0 100 100">
+      <g clip-path="url(#emblem-clip)">
+        <rect x="0"  y="0"  width="30" height="61"/>
+        <rect x="42" y="0"  width="58" height="61"/>
+        <rect x="0"  y="68" width="30" height="32"/>
+        <rect x="42" y="68" width="58" height="32"/>
+      </g>
+    </symbol>
+    <linearGradient id="emblem-fill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#D8E6FF"/>
+    </linearGradient>
+  </defs>
+</svg>
+
+<div id="stage">
+
+  <div class="mock mock-a"><span>SCENE A</span></div>
+  <div class="mock mock-b"><span>SCENE B</span></div>
+
+  <!-- 1. shards -->
+  <div class="shards">
+    <div class="shard" style="--i:0; --edge:#00D4FF; --edgeA:rgba(0,212,255,.5)"></div>
+    <div class="shard" style="--i:1; --edge:#00A8FF; --edgeA:rgba(0,168,255,.5)"></div>
+    <div class="shard" style="--i:2; --edge:#3B7BFF; --edgeA:rgba(59,123,255,.5)"></div>
+    <div class="shard" style="--i:3; --edge:#7A4DFF; --edgeA:rgba(122,77,255,.5)"></div>
+    <div class="shard" style="--i:4; --edge:#A32DF0; --edgeA:rgba(163,45,240,.5)"></div>
+    <div class="shard" style="--i:5; --edge:#CE16DC; --edgeA:rgba(206,22,220,.5)"></div>
+    <div class="shard" style="--i:6; --edge:#EE00CC; --edgeA:rgba(238,0,204,.5)"></div>
+  </div>
+
+  <!-- 2. backdrop -->
+  <div class="backdrop">
+    <div class="glow"></div>
+    <div class="rays"></div>
+    <div class="grid"></div>
+    <div class="scanlines"></div>
+  </div>
+
+  <!-- 3. impact fx -->
+  <div class="fx">
+    <div class="ring"></div>
+    <div class="ring r2"></div>
+    <div class="streak" style="--y:10vh; --w:38vw; --h:2px; --sdly:0.00; --edge:#00D4FF"></div>
+    <div class="streak" style="--y:21vh; --w:22vw; --h:4px; --sdly:0.05; --edge:#4CC9FF"></div>
+    <div class="streak" style="--y:32vh; --w:52vw; --h:2px; --sdly:0.02; --edge:#00D4FF"></div>
+    <div class="streak" style="--y:43vh; --w:30vw; --h:5px; --sdly:0.08; --edge:#8A5BFF"></div>
+    <div class="streak" style="--y:55vh; --w:44vw; --h:3px; --sdly:0.01; --edge:#C11ADF"></div>
+    <div class="streak" style="--y:65vh; --w:26vw; --h:2px; --sdly:0.07; --edge:#EE00CC"></div>
+    <div class="streak" style="--y:77vh; --w:48vw; --h:4px; --sdly:0.03; --edge:#EE00CC"></div>
+    <div class="streak" style="--y:89vh; --w:20vw; --h:2px; --sdly:0.09; --edge:#FF57E0"></div>
+  </div>
+  <div class="flash"></div>
+
+  <!-- 4. card -->
+  <div class="card">
+    <div class="sponsor" role="img" aria-label="Petrolina"></div>
+
+    <div class="headline">
+      <div class="hl-inner">
+        <div class="line l1">
+          <span class="x-drop"></span><span class="x-outline"></span><span class="x-bevel"></span>
+          <span class="x-ghost c"></span><span class="x-ghost m"></span>
+          <span class="x-fill"></span><span class="x-shine"></span>
+        </div>
+        <div class="line l2">
+          <span class="x-drop"></span><span class="x-outline"></span><span class="x-bevel"></span>
+          <span class="x-ghost c"></span><span class="x-ghost m"></span>
+          <span class="x-fill"></span><span class="x-shine"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="stocks">
+        <div class="stock" style="--k:0; --edge:#00D4FF; --edgeA:rgba(0,212,255,.8)"><svg><use href="#stock"/></svg></div>
+        <div class="stock" style="--k:1; --edge:#8A5BFF; --edgeA:rgba(138,91,255,.8)"><svg><use href="#stock"/></svg></div>
+        <div class="stock" style="--k:2; --edge:#EE00CC; --edgeA:rgba(238,0,204,.8)"><svg><use href="#stock"/></svg></div>
+      </div>
+      <div class="tag"><div class="tag-plate"></div></div>
+    </div>
+  </div>
+
+  <div class="bug" role="img" aria-label="Limit Break"></div>
+
+  <div class="hint">preview mode &middot; press SPACE to replay</div>
+</div>
+
+<!-- stock token: dark disc, coloured rim, white emblem -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="stock" viewBox="0 0 100 100">
+    <circle cx="50" cy="50" r="47" fill="#0B0B22" stroke="currentColor" stroke-width="5"/>
+    <use href="#emblem" x="20" y="20" width="60" height="60" fill="url(#emblem-fill)"/>
+  </symbol>
+</svg>
+
+<script>
+(function () {
+  "use strict";
+
+  var stage  = document.getElementById("stage");
+  var params = new URLSearchParams(location.search);
+
+  var DEFAULT_DURATION = num(params.get("duration"), 2400);   // ms
+  var DEFAULT_TP       = num(params.get("tp"), 50) / 100;     // 0..1
+  var SOUND            = params.get("sound") !== "0";
+  var SOUND_GAIN       = num(params.get("volume"), 60) / 100;
+  var AUTOSTART        = params.get("autostart") === "1";
+  var IMPACT_MODE      = params.get("impact") || "auto";          // auto | synth
+  var IMPACT_GAIN      = num(params.get("impactVolume"), 75) / 100;
+  var IMPACT_OFFSET    = num(params.get("impactOffset"), 0) / 1000;
+  var IMPACT_ALIGN     = params.get("impactAlign") !== "0";
+  var CHIME_GAIN       = num(params.get("chimeVolume"), 70) / 100;
+  var FREEZE           = params.get("freeze");                    // ms, for still frames
+
+  var sawPluginEvent = false;
+
+  function num(v, d) { var n = parseFloat(v); return isFinite(n) ? n : d; }
+  function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+
+  /* ---------- text (overridable: ?title=FLAWLESS|VICTORY&tag=0 DEATHS) ---------- */
+
+  var lines = (params.get("title") || "PERFECT|GAME").split("|");
+  var l1 = lines[0] || "", l2 = lines.slice(1).join(" ");
+  var tag = params.get("tag");
+  if (tag === null) tag = "3 Stock";
+
+  function fill(sel, text) {
+    var spans = document.querySelectorAll(sel + " > span");
+    for (var i = 0; i < spans.length; i++) spans[i].textContent = text;
+  }
+  fill(".l1", l1);
+  fill(".l2", l2);
+  if (!l2) document.querySelector(".l2").style.display = "none";
+  if (!l2) document.querySelector(".l1").style.transform = "none";
+  document.querySelector(".tag-plate").textContent = tag;
+  if (!tag) document.querySelector(".tag").style.display = "none";
+
+  /* ---------- playback ---------- */
+
+  function play(duration, tp) {
+    duration = duration > 0 ? duration : DEFAULT_DURATION;
+    tp = clamp(tp > 0 ? tp : DEFAULT_TP, 0.05, 0.95);
+
+    stage.style.setProperty("--in",  (duration * tp) + "ms");
+    stage.style.setProperty("--out", (duration * (1 - tp)) + "ms");
+
+    stage.classList.remove("run");
+    void stage.offsetWidth;
+    stage.classList.add("run");
+
+    if (SOUND) { try { sfx(duration, tp); } catch (e) {} }
+  }
+
+  function stop() { stage.classList.remove("run"); }
+
+  /* ---------- OBS Browser Transition plugin hooks ---------- */
+
+  window.addEventListener("transitionStart", function (e) {
+    sawPluginEvent = true;
+    var d = e.detail;
+    if (typeof d === "string") { try { d = JSON.parse(d); } catch (err) { d = {}; } }
+    d = d || {};
+    play(num(d.duration, DEFAULT_DURATION), num(d.transitionPoint, DEFAULT_TP));
+  });
+
+  window.addEventListener("transitionStop", stop);
+
+  window.addEventListener("obsSourceActiveChanged", function (e) {
+    if (sawPluginEvent) return;
+    if (e.detail && e.detail.active) play(DEFAULT_DURATION, DEFAULT_TP);
+  });
+  window.addEventListener("obsSourceVisibleChanged", function (e) {
+    if (sawPluginEvent) return;
+    if (e.detail && e.detail.visible) play(DEFAULT_DURATION, DEFAULT_TP);
+  });
+
+  /* ---------- audio ---------- */
+
+  var ac = null, noiseBuf = null, master = null;
+
+  function audio() {
+    if (!ac) {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      ac = new AC();
+      var n = ac.sampleRate * 2;
+      noiseBuf = ac.createBuffer(1, n, ac.sampleRate);
+      var ch = noiseBuf.getChannelData(0);
+      for (var i = 0; i < n; i++) ch[i] = Math.random() * 2 - 1;
+    }
+    if (!master) { master = ac.createGain(); master.connect(ac.destination); }
+    if (ac.state === "suspended") ac.resume();
+    loadImpact();
+    return ac;
+  }
+
+  function whoosh(t0, dur, f0, f1, peak) {
+    var src = ac.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+    var bp = ac.createBiquadFilter(); bp.type = "bandpass"; bp.Q.value = 1.1;
+    var g = ac.createGain();
+    bp.frequency.setValueAtTime(f0, t0);
+    bp.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(peak, t0 + dur * 0.72);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    src.connect(bp); bp.connect(g); g.connect(master);
+    src.start(t0); src.stop(t0 + dur + 0.05);
+  }
+
+  /* bright bell for each stock: sine fundamental + a quiet inharmonic partial */
+  function chime(t0, freq, peak, len) {
+    if (peak < 0.0002) return;               // exponential ramps can't target 0
+    var g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(peak, t0 + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + len);
+    g.connect(master);
+
+    var o1 = ac.createOscillator(); o1.type = "sine"; o1.frequency.value = freq;
+    var o2 = ac.createOscillator(); o2.type = "triangle"; o2.frequency.value = freq * 2.76;
+    var g2 = ac.createGain(); g2.gain.value = 0.18;
+    o1.connect(g); o2.connect(g2); g2.connect(g);
+    o1.start(t0); o2.start(t0);
+    o1.stop(t0 + len + 0.05); o2.stop(t0 + len + 0.05);
+
+    // tiny sparkle transient
+    var src = ac.createBufferSource(); src.buffer = noiseBuf;
+    var hp = ac.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 6000;
+    var g3 = ac.createGain();
+    g3.gain.setValueAtTime(peak * 0.35, t0);
+    g3.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.06);
+    src.connect(hp); hp.connect(g3); g3.connect(master);
+    src.start(t0); src.stop(t0 + 0.08);
+  }
+
+  var IMPACT_URI    = "__IMPACT_AUDIO_URI__";
+  var impactBuf     = null;
+  var impactPending = false;
+  var impactNorm    = 1;
+  var impactOnset   = 0;
+
+  function loadImpact() {
+    if (impactPending || impactBuf || !IMPACT_URI || IMPACT_URI.indexOf("__") === 0) return;
+    impactPending = true;
+    try {
+      var bin = atob(IMPACT_URI.slice(IMPACT_URI.indexOf(",") + 1));
+      var bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      ac.decodeAudioData(
+        bytes.buffer,
+        function (decoded) { impactBuf = decoded; measureImpact(decoded); },
+        function () { impactPending = false; }
+      );
+    } catch (e) { impactPending = false; }
+  }
+
+  function measureImpact(buf) {
+    var ch = buf.getChannelData(0), n = ch.length, i, a;
+    var peak = 0;
+    for (i = 0; i < n; i++) { a = ch[i] < 0 ? -ch[i] : ch[i]; if (a > peak) peak = a; }
+    impactNorm = peak > 1e-4 ? Math.min(24, 0.9 / peak) : 1;
+    var thr = peak * 0.2;
+    impactOnset = 0;
+    for (i = 0; i < n; i++) {
+      a = ch[i] < 0 ? -ch[i] : ch[i];
+      if (a > thr) { impactOnset = i / buf.sampleRate; break; }
+    }
+    window.stingerImpactLoaded = true;
+  }
+
+  function impact(t0) {
+    if (impactBuf && IMPACT_MODE !== "synth") {
+      var s = ac.createBufferSource(); s.buffer = impactBuf;
+      var gi = ac.createGain(); gi.gain.value = clamp(IMPACT_GAIN, 0, 4) * impactNorm;
+      s.connect(gi); gi.connect(master);
+      s.start(Math.max(ac.currentTime, t0 + IMPACT_OFFSET - (IMPACT_ALIGN ? impactOnset : 0)));
+      return;
+    }
+    var o = ac.createOscillator(); o.type = "sine";
+    var g = ac.createGain();
+    o.frequency.setValueAtTime(210, t0);
+    o.frequency.exponentialRampToValueAtTime(42, t0 + 0.34);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(1.0, t0 + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.42);
+    o.connect(g); g.connect(master);
+    o.start(t0); o.stop(t0 + 0.45);
+
+    var src = ac.createBufferSource(); src.buffer = noiseBuf;
+    var lp = ac.createBiquadFilter(); lp.type = "lowpass";
+    var g2 = ac.createGain();
+    lp.frequency.setValueAtTime(9000, t0);
+    lp.frequency.exponentialRampToValueAtTime(700, t0 + 0.2);
+    g2.gain.setValueAtTime(0.55, t0);
+    g2.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.22);
+    src.connect(lp); lp.connect(g2); g2.connect(master);
+    src.start(t0); src.stop(t0 + 0.25);
+  }
+
+  function sfx(duration, tp) {
+    if (!audio()) return;
+    master.gain.value = clamp(SOUND_GAIN, 0, 1) * 0.5;
+
+    var t = ac.currentTime + 0.01;
+    var inS = (duration * tp) / 1000;
+    var outS = (duration * (1 - tp)) / 1000;
+    var cg = clamp(CHIME_GAIN, 0, 2) * 0.32;
+
+    whoosh(t, inS * 0.80, 260, 3600, 0.42);                     // shards in
+    impact(t + inS * 0.585);                                     // headline lands
+    // stock pops peak at 45% of a 0.26·in pop -> +0.117·in
+    chime(t + inS * 0.717, 880.00,  cg, 0.55);                   // A5
+    chime(t + inS * 0.817, 1108.73, cg, 0.55);                   // C#6
+    chime(t + inS * 0.917, 1318.51, cg, 0.9);                    // E6
+    chime(t + inS * 0.917, 1760.00, cg * 0.45, 1.1);             // A6 shimmer on the last one
+    whoosh(t + inS + outS * 0.32, outS * 0.64, 3000, 220, 0.34); // shards out
+  }
+
+  /* ---------- preview / stills ---------- */
+
+  function startPreview() {
+    document.body.classList.add("preview");
+    var period = DEFAULT_DURATION + 1100;
+    play(DEFAULT_DURATION, DEFAULT_TP);
+    setInterval(function () { play(DEFAULT_DURATION, DEFAULT_TP); }, period);
+  }
+
+  // ?freeze=<ms> renders the single frame at that time (&mock=0 for a transparent one).
+  function freezeAt(ms) {
+    if (params.get("mock") !== "0") document.body.classList.add("preview");
+    play(DEFAULT_DURATION, DEFAULT_TP);
+    var anims = document.getAnimations();
+    for (var i = 0; i < anims.length; i++) { anims[i].pause(); anims[i].currentTime = ms; }
+  }
+
+  if (SOUND && FREEZE === null) { try { audio(); } catch (e) {} }
+
+  document.addEventListener("keydown", function (e) {
+    if (e.code === "Space") { e.preventDefault(); play(DEFAULT_DURATION, DEFAULT_TP); }
+  });
+
+  if (FREEZE !== null) {
+    SOUND = false;
+    (document.fonts ? document.fonts.ready : Promise.resolve()).then(function () { freezeAt(num(FREEZE, 0)); });
+  } else if (params.get("preview") === "1") {
+    startPreview();
+  } else if (!window.obsstudio) {
+    setTimeout(function () { if (!sawPluginEvent) startPreview(); }, 800);
+  } else if (AUTOSTART) {
+    setTimeout(function () { if (!sawPluginEvent) play(DEFAULT_DURATION, DEFAULT_TP); }, 60);
+  }
+})();
+</script>
+</body>
+</html>
