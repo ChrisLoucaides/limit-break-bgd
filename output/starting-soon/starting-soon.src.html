@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Limit Break — Stream Starting Soon</title>
+<style>
+/* ============================================================
+   LIMIT BREAK — "Stream Starting Soon" + countdown
+   OBS Browser source, transparent background, sits on top of
+   whatever scene art you like (e.g. the FF7 petrolina still).
+   Brand: cyan #00D4FF -> magenta #EE00CC.
+
+   Everything is tunable from the URL, see README.md:
+     ?m=10  ?text=Stream Starting Soon  ?size=1  ?x=8  ?y=50  ?frame=1
+   ============================================================ */
+
+@font-face {
+  font-family: "Saira SC";
+  src: url(__FONT_URI__) format("woff2");
+  font-weight: 800;
+  font-display: block;
+}
+
+:root {
+  --cyan: #00D4FF;
+  --magenta: #EE00CC;
+  --ink: #08081A;
+
+  /* 1 unit = 1% of the height of a 16:9 box that fits the source, so the
+     layout keeps its proportions whatever size the browser source is. */
+  --u: min(1vh, 0.5625vw);
+
+  --scale: 1;            /* ?size=   overall multiplier            */
+  --x: 8;                /* ?x=      left margin, % of width       */
+  --y: 50;               /* ?y=      block centre, % of height     */
+  --skew: -9deg;         /* ?skew=   oblique                       */
+  --tilt: -10.2deg;       /* ?tilt=   anticlockwise lift            */
+  --indent: 0.26em;      /* ?indent= how far line 2 sits right     */
+
+  /* the dark edge: outline thickness + hard shadow offset */
+  --outline: 0.028em;
+  --dx: 0.072em;
+  --dy: 0.08em;
+  --edge: rgba(8, 8, 26, 0.95);
+
+  --grad: 165deg;        /* ?grad=  angle of the clock's gradient  */
+
+  /* where the clock sits next to SOON */
+  --clock-gap: 0.15em;   /* ?gap=   space after SOON, em of the clock */
+  --clock-lift: 0.6em;  /* ?lift=  how far above the baseline, em    */
+
+  --head: calc(var(--u) * 15.5 * var(--scale));
+  --clock: calc(var(--head) * 0.56);
+}
+
+html, body {
+  margin: 0; padding: 0; width: 100%; height: 100%;
+  background: transparent;
+  overflow: hidden;
+  cursor: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- optional inset frame (matches the scene art) ---------- */
+
+#frame {
+  position: fixed;
+  inset: calc(var(--u) * 3.2) calc(var(--u) * 3.2 / 0.5625);
+  border: 2px solid transparent;
+  background: linear-gradient(160deg, var(--cyan) 0%, #7A6BE8 45%, var(--magenta) 100%)
+              border-box;
+  -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  opacity: 0.85;
+  display: none;
+}
+body.frame #frame { display: block; }
+
+/* ---------- the headline block ---------- */
+
+#block {
+  position: fixed;
+  left: calc(var(--x) * 1%);
+  top: calc(var(--y) * 1%);
+  transform: translateY(-50%) rotate(var(--tilt)) skewX(var(--skew));
+  transform-origin: left center;
+  font-family: "Saira SC", "Saira SemiCondensed", Impact, sans-serif;
+  font-weight: 800;
+  text-transform: uppercase;
+  line-height: 0.88;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  opacity: 0;
+  animation: rise 900ms cubic-bezier(.16, .9, .3, 1) 120ms forwards;
+}
+
+@keyframes rise {
+  from { opacity: 0;
+         transform: translateY(calc(-50% + var(--u) * 2.2)) rotate(var(--tilt)) skewX(var(--skew)); }
+  to   { opacity: 1;
+         transform: translateY(-50%) rotate(var(--tilt)) skewX(var(--skew)); }
+}
+
+/* dark edge: an 8-way outline, the offset hard shadow, then a whisper of
+   soft shadow so the white still reads over bright parts of the artwork */
+.line, #clock {
+  text-shadow:
+    calc(var(--outline) * -1) calc(var(--outline) * -1) 0 var(--edge),
+    0                         calc(var(--outline) * -1) 0 var(--edge),
+    var(--outline)            calc(var(--outline) * -1) 0 var(--edge),
+    var(--outline)            0                         0 var(--edge),
+    var(--outline)            var(--outline)            0 var(--edge),
+    0                         var(--outline)            0 var(--edge),
+    calc(var(--outline) * -1) var(--outline)            0 var(--edge),
+    calc(var(--outline) * -1) 0                         0 var(--edge),
+    var(--dx) var(--dy) 0 var(--edge),
+    0 0 calc(var(--u) * 1.1) rgba(0, 0, 0, 0.45);
+}
+
+.line {
+  display: block;
+  font-size: var(--head);
+  color: #fff;
+}
+
+/* line 2 sits a touch further right, as on the key art */
+#l2 { padding-left: var(--indent); }
+
+/* the last line and the clock share a baseline */
+.line--last {
+  display: flex;
+  align-items: baseline;
+}
+
+/* ---------- the clock ---------- */
+
+/* the shadow lives on the wrapper: a filter on the gradient span itself
+   fights with background-clip:text and hollows the digits out. */
+#clock {
+  position: relative;
+  margin-left: var(--clock-gap);
+  top: calc(var(--clock-lift) * -1);
+  font-size: var(--clock);
+  letter-spacing: 0.005em;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+
+/* the gradient face, painted over the shadowed white one */
+#clock::after {
+  content: attr(data-t);
+  position: absolute;
+  left: 0; top: 0;
+  background: linear-gradient(var(--grad), var(--cyan) 6%, #8F73F0 48%, var(--magenta) 92%);
+  -webkit-background-clip: text;
+          background-clip: text;
+  -webkit-text-fill-color: transparent;
+          color: transparent;
+  text-shadow: none;
+}
+
+/* last 60 seconds: a soft heartbeat, then it rests on 00:00 */
+body.final #clock { animation: pulse 1s ease-in-out infinite; }
+body.done  #clock { animation: pulse 1.8s ease-in-out infinite; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  55%      { opacity: 0.82; }
+}
+</style>
+</head>
+<body>
+
+<div id="frame"></div>
+
+<div id="block">
+  <span class="line" id="l1">Stream</span>
+  <span class="line" id="l2">Starting</span>
+  <span class="line line--last"><span id="l3">Soon</span><span id="clock" data-t="10:00">10:00</span></span>
+</div>
+
+<script>
+(function () {
+  var q = new URLSearchParams(location.search);
+  var num = function (key, dflt) {
+    var v = parseFloat(q.get(key));
+    return isFinite(v) ? v : dflt;
+  };
+
+  /* ---- look ---- */
+  var root = document.documentElement.style;
+  root.setProperty('--scale', num('size', 1));
+  root.setProperty('--x', num('x', 8));
+  root.setProperty('--y', num('y', 50));
+  if (q.get('skew') !== null) root.setProperty('--skew', num('skew', -9) + 'deg');
+  if (q.get('tilt') !== null) root.setProperty('--tilt', num('tilt', -10.2) + 'deg');
+  if (q.get('indent') !== null) root.setProperty('--indent', num('indent', 0.26) + 'em');
+  if (q.get('gap') !== null) root.setProperty('--clock-gap', num('gap', 0.15) + 'em');
+  if (q.get('lift') !== null) root.setProperty('--clock-lift', num('lift', 0.6) + 'em');
+  if (q.get('grad') !== null) root.setProperty('--grad', num('grad', 165) + 'deg');
+  if (q.get('frame') === '1') document.body.classList.add('frame');
+
+  /* ---- headline text ---------------------------------------------------
+     ?text=Top 8|Starting|Soon   -> one line per | (or /), so a line can
+                                    hold more than one word
+     ?text=Stream Starting Soon  -> no separator, so one word per line     */
+  var raw = (q.get('text') || 'Stream Starting Soon').trim();
+  var parts = /[|\/]/.test(raw) ? raw.split(/\s*[|\/]\s*/) : raw.split(/\s+/);
+  var lines = document.querySelectorAll('#l1, #l2, #l3');
+  for (var i = 0; i < lines.length; i++) {
+    lines[i].textContent = parts[i] || '';
+    if (!parts[i]) lines[i].parentNode.style.display = 'none';
+  }
+
+  /* ---- the countdown ----
+     ?m=10          minutes (default 10), ?s= extra seconds
+     ?at=19:30      count down to a wall-clock time today instead
+     ?persist=1     survive a browser-source refresh instead of restarting
+     ?after=Now     what the clock says once it hits zero          */
+  var DUR = (num('m', 10) * 60 + num('s', 0)) * 1000;
+  var KEY = 'lb-starting-soon-deadline';
+  var after = q.get('after');
+  var deadline;
+
+  var at = q.get('at');
+  if (at && /^\d{1,2}:\d{2}$/.test(at)) {
+    var hm = at.split(':');
+    var t = new Date();
+    t.setHours(+hm[0], +hm[1], 0, 0);
+    if (t.getTime() <= Date.now()) t.setDate(t.getDate() + 1);   // already past -> tomorrow
+    deadline = t.getTime();
+  } else if (q.get('persist') === '1' && q.get('reset') !== '1') {
+    var saved = parseFloat(localStorage.getItem(KEY));
+    deadline = (isFinite(saved) && saved > Date.now()) ? saved : Date.now() + DUR;
+    try { localStorage.setItem(KEY, deadline); } catch (e) {}
+  } else {
+    deadline = Date.now() + DUR;
+  }
+
+  var clock = document.getElementById('clock');
+  var shown = null;
+
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+
+  function tick() {
+    var left = Math.max(0, deadline - Date.now());
+    var secs = Math.ceil(left / 1000);
+
+    var text;
+    if (secs === 0 && after) {
+      text = after;
+    } else {
+      var h = Math.floor(secs / 3600);
+      var m = Math.floor(secs / 60) % 60;
+      text = (h ? h + ':' + pad(m) : pad(m)) + ':' + pad(secs % 60);
+    }
+
+    if (text !== shown) {
+      shown = text;
+      clock.textContent = text;
+      clock.setAttribute('data-t', text);
+      document.body.classList.toggle('final', secs > 0 && secs <= 60);
+      document.body.classList.toggle('done', secs === 0);
+    }
+    requestAnimationFrame(tick);
+  }
+  tick();
+})();
+</script>
+</body>
+</html>

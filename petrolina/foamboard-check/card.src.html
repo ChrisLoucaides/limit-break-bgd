@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Petrolina Prize Card — foamboard</title>
+<style>
+/* ============================================================
+   PETROLINA PRIZE CARD — giant foamboard "cheque"
+   Same card format as last year's sponsor board, re-themed with
+   the Petrolina palette used on the instant-replay stinger:
+     #00529B logo blue · #009CDE accent · #003087 deep
+   Name and amount are deliberately left blank — fill in by hand.
+
+   Design units are CSS px on a 1712 x 1080 card (ISO/IEC 7810
+   ID-1 proportions). build.py renders it at 4x for print.
+   ============================================================ */
+
+@font-face {
+  font-family: "Saira SC";
+  font-weight: 800;
+  src: url(__FONT_800__) format("woff2");
+}
+@font-face {
+  font-family: "Saira SC";
+  font-weight: 700;
+  src: url(__FONT_700__) format("woff2");
+}
+
+:root {
+  --blue:        #00529B;
+  --blue-bright: #009CDE;
+  --blue-deep:   #003087;
+  --ink:         #001B45;
+  --white:       #FFFFFF;
+  --bleed: 0px;
+}
+
+html, body { margin: 0; padding: 0; background: transparent; }
+body.bleed { --bleed: 36px; }
+
+@page { size: 1712px 1080px; margin: 0; }
+
+.card {
+  position: relative;
+  width:  calc(1712px + 2 * var(--bleed));
+  height: calc(1080px + 2 * var(--bleed));
+  border-radius: 88px;
+  overflow: hidden;
+  background:
+    radial-gradient(70% 90% at 78% 44%, rgba(0,156,222,0.38), transparent 70%),
+    radial-gradient(60% 80% at 8% 100%, rgba(0,20,70,0.55), transparent 70%),
+    linear-gradient(116deg, #0B67BD 0%, #00529B 36%, #00438D 64%, #002F72 100%);
+  font-family: "Saira SC", "Bahnschrift", "Arial Narrow", sans-serif;
+  color: var(--white);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+body.bleed .card { border-radius: 0; }
+
+.inner {
+  position: absolute;
+  left: var(--bleed); top: var(--bleed);
+  width: 1712px; height: 1080px;
+}
+.inner > * { position: absolute; }
+
+/* ---------- background dressing ---------- */
+
+/* the Petrolina badge outline, huge and faint — this year's version of
+   last year's watermark ornament */
+.badge-mark {
+  left: -150px; top: 272px; width: 1040px; height: 1040px;
+  opacity: 0.06;
+}
+
+/* raked racing stripes behind the helmet */
+.stripes {
+  left: 520px; top: -300px; width: 1500px; height: 1700px;
+  transform: skewX(-22deg);
+  background:
+    linear-gradient(90deg, transparent 36%, rgba(0,156,222,0.20) 36%, rgba(0,156,222,0.20) 41%, transparent 41%),
+    linear-gradient(90deg, transparent 43%, rgba(255,255,255,0.08) 43%, rgba(255,255,255,0.08) 44.6%, transparent 44.6%),
+    linear-gradient(90deg, transparent 80%, rgba(0,48,135,0.40) 80%, rgba(0,48,135,0.40) 88%, transparent 88%);
+}
+
+/* fine speed hatching across the top edge */
+.hatch {
+  left: 560px; top: 0; width: 1200px; height: 150px;
+  background: repeating-linear-gradient(112deg, rgba(255,255,255,0.05) 0 3px, transparent 3px 26px);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 40%, #000 80%, transparent);
+          mask-image: linear-gradient(90deg, transparent, #000 40%, #000 80%, transparent);
+}
+
+.art { left: 0; top: 0; width: 1712px; height: 1080px; overflow: visible; }
+
+/* ---------- card furniture ---------- */
+
+.logo {
+  left: 98px; top: 70px; width: 440px;
+  filter: drop-shadow(0 10px 22px rgba(0,16,50,0.45));
+}
+
+.chip { left: 116px; top: 318px; width: 178px; height: 138px; }
+
+.contactless { left: 326px; top: 346px; width: 56px; height: 84px; opacity: 0.9; overflow: visible; }
+
+.field { left: 112px; width: 640px; }
+.field .label {
+  display: flex; align-items: center; gap: 18px;
+  font-weight: 800; font-size: 54px; line-height: 1;
+  letter-spacing: 0.035em;
+  text-shadow: 0 3px 10px rgba(0,16,50,0.35);
+}
+/* the stinger's slanted speed marks */
+.marks { display: flex; gap: 6px; transform: translateY(-2px); }
+.marks s {
+  display: block; width: 9px; height: 34px;
+  background: var(--blue-bright);
+  transform: skewX(-24deg);
+}
+.marks s:nth-child(1) { opacity: 0.45; }
+.marks s:nth-child(2) { opacity: 0.72; }
+
+.rule {
+  position: absolute; left: 0; height: 5px; border-radius: 3px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.95), rgba(255,255,255,0.95) 88%, rgba(0,156,222,0.9));
+  box-shadow: 0 2px 8px rgba(0,16,50,0.35);
+}
+
+.f-holder { top: 520px; }
+.f-holder .rule.r1 { top: 150px; width: 640px; }
+.f-holder .rule.r2 { top: 258px; width: 640px; }
+
+.f-amount { top: 830px; }
+.f-amount .rule { top: 148px; width: 420px; }
+
+</style>
+</head>
+<body>
+<script>if (location.hash === "#bleed") document.body.classList.add("bleed");</script>
+
+<div class="card">
+  <div class="inner">
+
+    <svg class="badge-mark" viewBox="0 0 100 100" aria-hidden="true">
+      <!-- Petrolina badge silhouette: notched top corners, sides sweeping to a point -->
+      <path d="M8 26 L14 20 L86 20 L92 26 L90 38 L50 78 L10 38 Z"
+            fill="none" stroke="#FFFFFF" stroke-width="1.6" stroke-linejoin="miter"/>
+      <path d="M13 28 L17 24 L83 24 L87 28 L85.6 36.6 L50 72.4 L14.4 36.6 Z"
+            fill="none" stroke="#FFFFFF" stroke-width="0.6" stroke-linejoin="miter"/>
+    </svg>
+
+    <div class="stripes"></div>
+    <div class="hatch"></div>
+
+    __ART_SVG__
+
+    <img class="logo" src="__LOGO__" alt="Petrolina">
+
+    <svg class="chip" viewBox="0 0 178 138" aria-hidden="true">
+      <defs>
+        <linearGradient id="chipMetal" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#F2F5F8"/>
+          <stop offset="0.45" stop-color="#C4CCD5"/>
+          <stop offset="0.7" stop-color="#E4E9EE"/>
+          <stop offset="1" stop-color="#9EA8B3"/>
+        </linearGradient>
+      </defs>
+      <rect x="1" y="1" width="176" height="136" rx="24" fill="url(#chipMetal)"/>
+      <g fill="none" stroke="#8C96A2" stroke-width="3.5" stroke-linecap="round">
+        <path d="M1 46 H52 M1 92 H52 M126 46 H177 M126 92 H177"/>
+        <path d="M89 1 V26 M89 112 V137"/>
+        <rect x="52" y="26" width="74" height="86" rx="18"/>
+        <path d="M52 69 H74 M104 69 H126"/>
+      </g>
+    </svg>
+
+    <svg class="contactless" viewBox="0 0 60 86" aria-hidden="true">
+      <g fill="none" stroke="#FFFFFF" stroke-width="6.5" stroke-linecap="round">
+        <path d="M4 32 A14 14 0 0 1 4 52"/>
+        <path d="M18 22 A28 28 0 0 1 18 62"/>
+        <path d="M32 12 A42 42 0 0 1 32 72"/>
+        <path d="M46 2 A56 56 0 0 1 46 82"/>
+      </g>
+    </svg>
+
+    <div class="field f-holder">
+      <div class="label">CARDHOLDER <span class="marks"><s></s><s></s><s></s></span></div>
+      <div class="rule r1"></div>
+      <div class="rule r2"></div>
+    </div>
+
+    <div class="field f-amount">
+      <div class="label">AMOUNT <span class="marks"><s></s><s></s><s></s></span></div>
+      <div class="rule"></div>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

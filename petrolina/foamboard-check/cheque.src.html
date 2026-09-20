@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Petrolina Prize Cheque — foamboard</title>
+<style>
+/* ============================================================
+   PETROLINA PRIZE CHEQUE — giant foamboard cheque
+   The card design re-imagined as a real cheque: Petrolina-blue
+   header, chequered-flag rule, guilloche security pattern, and
+   blank payee / amount / date / signature fields.
+   Name and amount are deliberately left blank — fill in by hand.
+
+   Design units are CSS px on a 2400 x 1080 cheque (2.22 : 1,
+   e.g. 100 x 45 cm). build.py renders it at 3x for print.
+   ============================================================ */
+
+@font-face { font-family: "Saira SC"; font-weight: 800; src: url(__FONT_800__) format("woff2"); }
+@font-face { font-family: "Signature"; font-weight: 400; src: url(__FONT_SIG__) format("woff2"); }
+@font-face { font-family: "Saira SC"; font-weight: 700; src: url(__FONT_700__) format("woff2"); }
+
+:root {
+  --blue:        #00529B;
+  --blue-bright: #009CDE;
+  --blue-deep:   #003087;
+  --navy:        #0A1F45;
+  --paper:       #F6F9FC;
+  --bleed: 0px;
+}
+
+html, body { margin: 0; padding: 0; background: transparent; }
+body.bleed { --bleed: 36px; }
+
+@page { size: 2400px 1080px; margin: 0; }
+
+.cheque {
+  position: relative;
+  width:  calc(2400px + 2 * var(--bleed));
+  height: calc(1080px + 2 * var(--bleed));
+  border-radius: 28px;
+  overflow: hidden;
+  background:
+    radial-gradient(50% 70% at 60% 60%, #FFFFFF, transparent 70%),
+    linear-gradient(180deg, #F8FBFE 0%, #E7F0F9 100%);
+  font-family: "Saira SC", "Bahnschrift", "Arial Narrow", sans-serif;
+  color: var(--navy);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+body.bleed .cheque { border-radius: 0; }
+
+/* header and footer bands run into the bleed, so they live outside .inner */
+.band-top {
+  position: absolute; left: 0; right: 0; top: 0;
+  height: calc(250px + var(--bleed));
+  background:
+    radial-gradient(40% 120% at 72% 0%, rgba(0,156,222,0.45), transparent 70%),
+    linear-gradient(100deg, #0B67BD 0%, #00529B 40%, #00438D 70%, #002F72 100%);
+  overflow: hidden;
+}
+.band-top .stripes {
+  position: absolute; left: 900px; top: -100px; width: 1800px; height: 500px;
+  transform: skewX(-24deg);
+  background:
+    linear-gradient(90deg, transparent 30%, rgba(0,156,222,0.30) 30%, rgba(0,156,222,0.30) 34%, transparent 34%),
+    linear-gradient(90deg, transparent 36%, rgba(255,255,255,0.10) 36%, rgba(255,255,255,0.10) 37.4%, transparent 37.4%),
+    linear-gradient(90deg, transparent 72%, rgba(0,32,100,0.35) 72%, rgba(0,32,100,0.35) 80%, transparent 80%);
+}
+.band-top .hatch {
+  position: absolute; left: 700px; top: 0; width: 1800px; height: 100%;
+  background: repeating-linear-gradient(112deg, rgba(255,255,255,0.05) 0 3px, transparent 3px 26px);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 40%);
+          mask-image: linear-gradient(90deg, transparent, #000 40%);
+}
+
+.checker {
+  position: absolute; left: 0; right: 0;
+  top: calc(250px + var(--bleed)); height: 36px;
+  background-color: #FFFFFF;
+  background-image:
+    linear-gradient(45deg, var(--navy) 25%, transparent 25%, transparent 75%, var(--navy) 75%),
+    linear-gradient(45deg, var(--navy) 25%, transparent 25%, transparent 75%, var(--navy) 75%);
+  background-size: 36px 36px;
+  background-position: calc(var(--bleed) * -1) 0, calc(18px - var(--bleed)) 18px;
+}
+.checker::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -6px; height: 6px;
+  background: var(--blue-bright);
+}
+
+.band-bottom {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  height: calc(34px + var(--bleed));
+  background: linear-gradient(100deg, #0B67BD, #00529B 40%, #002F72);
+}
+.band-bottom::before {
+  content: ""; position: absolute; left: 0; right: 0; top: -6px; height: 6px;
+  background: var(--blue-bright);
+}
+
+.inner {
+  position: absolute;
+  left: var(--bleed); top: var(--bleed);
+  width: 2400px; height: 1080px;
+}
+.inner > * { position: absolute; }
+
+.guilloche { left: 0; top: 0; width: 2400px; height: 1080px; }
+
+/* ---------- header content ---------- */
+
+.logo {
+  left: 70px; top: 36px; height: 178px;
+  filter: drop-shadow(0 10px 22px rgba(0,16,50,0.45));
+}
+
+.title {
+  right: 90px; top: 58px;
+  display: flex; align-items: center; gap: 30px;
+  color: #FFFFFF;
+  font-weight: 800; font-size: 118px; line-height: 1;
+  letter-spacing: 0.05em;
+  text-shadow: 0 6px 18px rgba(0,16,50,0.40);
+}
+.title small {
+  display: block;
+  font-weight: 700; font-size: 30px; letter-spacing: 0.42em;
+  color: rgba(255,255,255,0.78);
+  margin-top: 10px; text-align: right;
+  text-shadow: none;
+}
+
+/* the stinger's slanted speed marks */
+.marks { display: flex; gap: 10px; }
+.marks s {
+  display: block; width: 16px; height: 86px;
+  background: var(--blue-bright);
+  transform: skewX(-24deg);
+  box-shadow: 0 0 18px rgba(0,156,222,0.6);
+}
+.marks s:nth-child(1) { opacity: 0.45; }
+.marks s:nth-child(2) { opacity: 0.72; }
+.marks.small { gap: 6px; }
+.marks.small s { width: 8px; height: 30px; box-shadow: none; }
+
+/* ---------- fields ---------- */
+
+.label {
+  display: flex; align-items: center; gap: 16px;
+  font-weight: 700; font-size: 34px; line-height: 1.05;
+  letter-spacing: 0.12em;
+  color: var(--blue);
+}
+.line {
+  height: 5px; border-radius: 3px;
+  background: var(--navy);
+}
+
+.f-date       { left: 1686px; top: 372px; }
+.l-date       { left: 1846px; top: 410px; width: 474px; }
+
+.f-pay        { left: 90px;  top: 520px; }
+.l-pay        { left: 470px; top: 600px; width: 1210px; }
+
+.amount {
+  left: 1790px; top: 488px; width: 530px; height: 150px;
+  box-sizing: border-box;
+  background: #FFFFFF;
+  border: 5px solid var(--blue);
+  border-radius: 18px;
+  box-shadow: 0 10px 26px rgba(0,48,135,0.14), inset 0 0 0 8px rgba(0,156,222,0.10);
+  display: flex; align-items: center;
+}
+.amount .cur {
+  width: 128px; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 92px; color: #FFFFFF;
+  background: var(--blue);
+  border-radius: 10px 0 0 10px;
+}
+
+.f-sum        { left: 90px;  top: 700px; }
+.l-sum        { left: 470px; top: 752px; width: 1850px; }
+
+.sig {
+  left: 1640px; top: 900px; width: 680px;
+}
+.sig .line { width: 100%; }
+.sig .cap {
+  margin-top: 16px;
+  font-weight: 700; font-size: 26px; letter-spacing: 0.3em;
+  color: var(--blue); text-align: center;
+}
+
+.micr {
+  left: var(--micr-left, 90px); top: 950px;
+  display: flex; align-items: center; gap: 26px;
+  font-family: "Consolas", "OCR A Extended", monospace;
+  font-size: 40px; letter-spacing: 0.14em;
+  color: rgba(10,31,69,0.72);
+}
+.micr i {
+  display: inline-block; width: 26px; height: 34px;
+  background:
+    linear-gradient(currentColor, currentColor) 0 0 / 8px 100% no-repeat,
+    linear-gradient(currentColor, currentColor) 14px 8px / 12px 18px no-repeat;
+  opacity: 0.9;
+}
+/* event / community logos, bottom left on the light paper where their
+   orange, purple and olive read cleanly */
+.partners {
+  left: 30px; top: 806px; height: 190px;
+  padding: 18px 60px;
+  display: flex; align-items: center; gap: 44px;
+  /* paper-coloured halo so the guilloche doesn't run through the logos */
+  background: radial-gradient(closest-side, rgba(244,248,252,0.97) 62%, rgba(244,248,252,0) 100%);
+}
+.partners img { display: block; height: 100%; width: auto; }
+.partners img.ccc { height: 176px; }
+.partners .divider {
+  width: 4px; height: 150px; border-radius: 2px;
+  background: linear-gradient(180deg, transparent, rgba(0,82,155,0.35), transparent);
+}
+.partners img.tekkency { height: auto; width: 470px; }
+.has-partners .micr { --micr-left: 900px; }
+.has-partners.with-tekkency .micr { --micr-left: 1060px; }
+
+/* print sponsor, in the header beside the Petrolina logo */
+.print-sponsor {
+  left: 480px; top: 50px; height: 150px;
+  display: flex; align-items: center; gap: 34px;
+}
+.print-sponsor .divider {
+  width: 4px; height: 130px; border-radius: 2px;
+  background: linear-gradient(180deg, transparent, rgba(255,255,255,0.55), transparent);
+}
+.print-sponsor .cap {
+  font-weight: 700; font-size: 24px; line-height: 1.35; letter-spacing: 0.3em;
+  color: rgba(255,255,255,0.78);
+}
+.print-sponsor img {
+  display: block; height: 130px; width: auto;
+  filter: drop-shadow(0 8px 18px rgba(0,16,50,0.40));
+}
+
+/* ---------- filled-in values (winner variants only) ---------- */
+.fill {
+  font-weight: 700; line-height: 1; white-space: nowrap;
+  color: var(--navy);
+}
+.v-date   { left: 1846px; width: 474px; top: 342px; font-size: 58px; text-align: center; letter-spacing: 0.04em; }
+.v-pay    { left: 500px;  top: 520px; font-size: 68px; letter-spacing: 0.01em; }
+.v-sum    { left: 500px;  top: 672px; font-size: 68px; letter-spacing: 0.01em; }
+.v-amount {
+  left: 1918px; width: 402px; top: 488px; height: 150px;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 104px; letter-spacing: 0.04em;
+}
+.v-sig {
+  left: 1640px; width: 680px; top: 786px;
+  font-family: "Signature", "Segoe Script", cursive;
+  font-weight: 400; font-size: 168px; text-align: center;
+  color: #0B2F7A;
+  transform: rotate(-4deg);
+}
+</style>
+</head>
+<body>
+<script>if (location.hash === "#bleed") document.body.classList.add("bleed");</script>
+
+<div class="cheque">
+
+  <div class="band-top"><div class="stripes"></div><div class="hatch"></div></div>
+  <div class="checker"></div>
+  <div class="band-bottom"></div>
+
+  <div class="inner">
+
+    __GUILLOCHE__
+
+    <img class="logo" src="__LOGO__" alt="Petrolina">
+
+    <div class="title">
+      <span class="marks"><s></s><s></s><s></s></span>
+      <div>PRIZE CHEQUE<small>__SUBTITLE__</small></div>
+    </div>
+
+    <div class="label f-date">DATE</div>
+    <div class="line l-date"></div>
+
+    <div class="label f-pay"><span class="marks small"><s></s><s></s><s></s></span><span>PAY TO THE<br>ORDER OF</span></div>
+    <div class="line l-pay"></div>
+
+    <div class="amount"><div class="cur">€</div></div>
+
+    <div class="label f-sum"><span class="marks small"><s></s><s></s><s></s></span>THE SUM OF</div>
+    <div class="line l-sum"></div>
+
+    <div class="sig">
+      <div class="line"></div>
+      <div class="cap">AUTHORISED SIGNATURE</div>
+    </div>
+
+    __PARTNERS__
+
+    __PRINT_SPONSOR__
+
+    __FILL__
+
+    <div class="micr"><i></i><span>__CHEQUE_NO__</span><i></i><span>2026</span><i></i><span>01</span></div>
+
+  </div>
+</div>
+
+</body>
+</html>
